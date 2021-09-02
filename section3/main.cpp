@@ -2,6 +2,7 @@
 
 #define log(x) std::cout << x << std::endl;
 
-int main () {
+int main()
+{
   log("QUE BRUH");
 }
