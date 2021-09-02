@@ -1,6 +1,6 @@
 #include <iostream>
 
-#define log(x) std::cout << x << std::endl;
+#define log(x) std::clog << x << std::endl;
 
 int main()
 {
