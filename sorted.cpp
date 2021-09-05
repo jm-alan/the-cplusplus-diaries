@@ -271,7 +271,6 @@ int main()
   // Theoretically, when this while loop merge has finished, we've successfully merged all of our sorts together into one massive
   // vector, and we're finished.
 
-  syncWatch(runningTimer);
   std::clog
     << "Merge completed in "
     << timerInMS(runningTimer)
