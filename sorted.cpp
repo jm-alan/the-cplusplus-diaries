@@ -13,9 +13,6 @@
 // Timer
 #include <chrono>
 
-// Make a log macro bc I do not want to type this everywhere
-#define log(x) std::clog << x << std::endl
-
 // and a system time macro as well
 #define now() std::chrono::system_clock::now()
 
@@ -104,15 +101,23 @@ int main()
 {
   // Poll hardware for number of logical threads
   const unsigned int queriedCPUs{std::thread::hardware_concurrency()};
-  log("Queried available logical processors");
-  log(queriedCPUs);
-  log("Is this correct? [y/n]");
+  std::clog
+      << "Queried available logical processors: "
+      << queriedCPUs
+      << std::endl
+      << std::endl;
+  std::clog
+      << "Is this correct? [y/n] ";
   char yesno;
   int threads;
   std::cin >> yesno;
+  std::clog
+    << std::endl
+    << std::endl;
   if (yesno != 'y' && yesno != 'Y')
   {
-    log("Please input the correct number of threads available on your machine:");
+    std::clog
+        << "Please input the correct number of threads available on your machine: ";
     std::cin >> threads;
   }
   else
@@ -123,26 +128,37 @@ int main()
   GlobalMemoryStatusEx(&stax);
   const int physMem = stax.ullAvailPhys / (1024 * 1024);
   const int totMem = stax.ullTotalPhys / (1024 * 1024);
-  log("Queried available memory in MB");
-  log(physMem);
-  log("of");
-  log(totMem);
-  log("Is this roughly correct? [y/n]");
+  std::clog
+      << "Queried available memory in MB: "
+      << std::endl
+      << std::endl
+      << physMem
+      << " of "
+      << totMem
+      << " available"
+      << std::endl
+      << std::endl
+      << "Is this roughly correct? [y/n] ";
   std::cin >> yesno;
   int mem;
   if (yesno != 'y' && yesno != 'Y')
   {
-    log("Please input the current amount of AVAILABLE (total - occupied) memory in your machine, in MB");
+    std::clog
+        << std::endl
+        << std::endl
+        << "Please input the current amount of AVAILABLE (total - occupied) memory in your machine, in MB ";
     std::cin >> mem;
   }
   else
     mem = physMem;
-
+  std::clog << std::endl;
   // Rough estimate that it takes about 20mb of RAM to allocate, sort, and merge 1,000,000 unsigned long longs
   int totalSort = (physMem / 20) * 1000000;
-  log("Max sortable long ints");
-
-  log(totalSort);
+  std::clog
+      << "Max sortable long ints: "
+      << totalSort
+      << std::endl
+      << std::endl;
 
   // Declare vectors to hold the different multi-threading "promsies"
   std::vector<std::future<void>> allocators{}, sorters{}, mergers{};
@@ -162,7 +178,10 @@ int main()
   for (int i = 0; i < threads; i++)
     vects.push_back(new std::vector<unsigned long long>{});
 
-  log("Allocating vector space");
+  std::clog
+      << "Allocating vector space"
+      << std::endl
+      << std::endl;
   // Start an absolute and per-area timer
   const std::chrono::_V2::system_clock::time_point globalTimer{now()};
   std::chrono::_V2::system_clock::time_point runningTimer{globalTimer};
@@ -181,15 +200,18 @@ int main()
       << "Allocation completed in "
       << timerInMS(runningTimer)
       << " milliseconds"
+      << std::endl
       << std::endl;
-
 
   // Dump the vector of resolved allocation futures
   std::vector<std::future<void>>{}.swap(allocators);
 
   // Bring the timer up to date
   syncWatch(runningTimer);
-  log("Let the sorting begin...");
+  std::clog
+      << "Let the sorting begin..."
+      << std::endl
+      << std::endl;
 
   // Identical process for creating the allocation threads, only for creating sorts now
   for (int i = 0; i < (threads - 1); i++)
@@ -203,15 +225,18 @@ int main()
     sorters[i].wait();
 
   std::clog
-    << "Sort completed in "
-    << timerInMS(runningTimer)
-    << " milliseconds"
+      << "Sort completed in "
+      << timerInMS(runningTimer)
+      << " milliseconds"
+      << std::endl
+      << std::endl;
+
+  std::clog
+    << "Beginning merge."
+    << std::endl
+    << "(memory usage will spike sporadically)"
     << std::endl
     << std::endl;
-
-  log("Beginning merge.");
-  log("(memory usage will spike sporadically)");
-  log("");
 
   syncWatch(runningTimer);
 
@@ -272,26 +297,25 @@ int main()
   // vector, and we're finished.
 
   std::clog
-    << "Merge completed in "
-    << timerInMS(runningTimer)
-    << " milliseconds"
-    << std::endl
-    << std::endl;
+      << "Merge completed in "
+      << timerInMS(runningTimer)
+      << " milliseconds"
+      << std::endl
+      << std::endl;
 
   std::clog
-    << "Total operation for allocating, sorting, and merging "
-    << totalSort
-    << " unsigned long long integers completed in "
-    << timerInMS(globalTimer)
-    << " milliseconds"
-    << std::endl
-    << std::endl;
-
+      << "Total operation for allocating, sorting, and merging "
+      << totalSort
+      << " unsigned long long integers completed in "
+      << timerInMS(globalTimer)
+      << " milliseconds"
+      << std::endl
+      << std::endl;
 
   // Uncomment the three lines below if you want to print the sorted vector when it's finished
   // acc.swap(*(sieves[sieves.size() - 1]));
   // const size_t accSize = acc.size();
   // for (int i = 0; i < accSize; i++)
-  //   log(acc[i]);
+  //   std::clog << acc[i]);
   system("pause");
 }
