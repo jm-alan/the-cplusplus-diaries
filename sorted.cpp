@@ -9,9 +9,9 @@
 // Hardware querying
 #include <windows.h>
 // Generating numbers to sort
-// #include <random>
+#include <random>
 
-//Make a log macro bc I do not want to type this everywhere
+// Make a log macro bc I do not want to type this everywhere
 #define log(x) std::clog << x << std::endl;
 
 // This does what it says on the tin. I had to abstract it because for some reason
@@ -25,10 +25,8 @@ void sort(std::vector<unsigned long long> *ptrV)
 void merge(
     std::vector<unsigned long long> *ptrL,
     std::vector<unsigned long long> *ptrR,
-    std::vector<unsigned long long> *ptrAcc,
-    const int id)
+    std::vector<unsigned long long> *ptrAcc)
 {
-  std::cout << "STARTED MERGE WITH ID" << id << std::endl;
   const size_t sizeL{ptrL->size()}, sizeR{ptrR->size()};
   unsigned int posL{}, posR{};
   while (posL < sizeL || posR < sizeR)
@@ -55,19 +53,17 @@ void merge(
       std::vector<unsigned long long>{}.swap(*ptrR);
     }
   }
-  std::cout << "FINISHED MERGE WITH ID " << id << std::endl;
 }
 
 // This fills a given vector with ceil number of random unsigned 8byte integers
 void alloc(std::vector<unsigned long long> *vect, const int ceil)
 {
-  // std::random_device rd;
-  // std::default_random_engine generator(rd());
-  // std::uniform_int_distribution<long long unsigned> distribution(0, 0xFFFFFFFFFFFFFFFF);
+  std::random_device rd;
+  std::default_random_engine generator(rd());
+  std::uniform_int_distribution<long long unsigned> distribution(0, 0xFFFFFFFFFFFFFFFF);
   for (int i = 0; i < ceil; i++)
-    vect->push_back(rand());
-  // vect->push_back(distribution(generator));
-  log("ALLOCATED VECTOR");
+    // vect->push_back(rand());
+    vect->push_back(distribution(generator));
   log(vect->size());
 }
 
@@ -107,14 +103,18 @@ int main()
     mem = physMem;
   // Rough estimate that it takes about 30mb to split, allocate, sort, and merge a vector with 1,000,000 unsigned 8-byte integers
   int totalSort = (physMem / 30) * 1000000;
-  totalSort = 10000;
   log("Max sortable long ints");
   log(totalSort);
   // Declare vectors to hold the different multi-threading "promsies"
   std::vector<std::future<void>> allocators{}, sorters{}, mergers{};
   // Declare 2D vectors to hold the dynamically allocated child vectors
   // One for the raw integers, and one for the merging phases
-  std::vector<std::vector<unsigned long long>> vects{}, sieves{};
+  std::vector<std::vector<unsigned long long>> vects{};
+  // The merging phase has to be constructed as a vector of pointers, because the double-nesting of
+  // the while loop and for loop below was causing the regular vectors to be garbage collected before
+  // they could be accessed in multiple threads, so I had to heap allocate them, and inline dereferencing
+  // caused the same issue so it HAD to be explicit pointers
+  std::vector<std::vector<unsigned long long> *> sieves{};
   std::vector<unsigned long long> acc{};
   // Create a vector for each CPU thread
   for (int i = 0; i < threads; i++)
@@ -150,9 +150,9 @@ int main()
     // Create a new vector into which we will merge the other two
     // Creating it out here and mutating it saves difficulty with having to
     // retrieve the value from the future later
-    sieves.push_back(std::vector<unsigned long long>{});
+    sieves.push_back(new std::vector<unsigned long long>{});
     // Push a merge future into the mergers future vector
-    mergers.push_back(std::async(std::launch::async, merge, &vects[i], &vects[i + 1], &sieves[sieves.size() - 1], i));
+    mergers.push_back(std::async(std::launch::async, merge, &vects[i], &vects[i + 1], sieves[sieves.size() - 1]));
   }
   // Wait for the merge threads to resolve
   for (int i = 0; i < mergers.size(); i++)
@@ -160,7 +160,7 @@ int main()
   // Preemptively create a position to track how many of the sieves we have recursively merged
   int sPos = 0;
   // While this position memory has not yet passed the total size of the sieves container
-  while (sieves[sieves.size() - 1].size() < totalSort)
+  while (sieves[sieves.size() - 1]->size() < totalSort)
   {
     // We store the size of the sieves vector prior to pushing anything into it so that we don't loop infinitely
     const size_t sieveSizeNow = sieves.size();
@@ -172,8 +172,8 @@ int main()
     // in the odd one out on the next iteration of the outer while loop, when this for loop starts over
     for (; sPos + 1 < sieveSizeNow; sPos += 2)
     {
-      sieves.push_back(std::vector<unsigned long long>{});
-      mergers.push_back(std::async(std::launch::async, merge, &sieves[sPos], &sieves[sPos + 1], &sieves[sieves.size() - 1], sPos));
+      sieves.push_back(new std::vector<unsigned long long>{});
+      mergers.push_back(std::async(std::launch::async, merge, sieves[sPos], sieves[sPos + 1], sieves[sieves.size() - 1]));
     }
     // Wait for all the merge threads to resolve
     for (int i = mergeSizeNow; i < mergers.size(); i++)
@@ -185,13 +185,10 @@ int main()
   // Theoretically, when this while loop merge has finished, we've successfully merged all of our sorts together into one massive
   // vector, and we're finished.
   // Grab the very final sieve
-  acc.swap(sieves[sieves.size() - 1]);
+  acc.swap(*(sieves[sieves.size() - 1]));
   // And dump the 2D sieve and vector containers from memory
-  std::vector<std::vector<unsigned long long>>{}.swap(sieves);
+  std::vector<std::vector<unsigned long long> *>{}.swap(sieves);
   std::vector<std::vector<unsigned long long>>{}.swap(vects);
-  const size_t accSize = acc.size();
-  for (int i = 0; i < accSize; i++)
-    log(acc[i]);
   log("SORT AND MERGE COMPLETE");
   system("pause");
 }
