@@ -29,6 +29,12 @@ void sort(std::vector<unsigned long long> *ptrV)
   std::sort(ptrV->begin(), ptrV->end());
 }
 
+void trash(std::vector<unsigned long long> *ptrV)
+{
+  std::vector<unsigned long long> vTrash;
+  ptrV->swap(vTrash);
+}
+
 // Also does what it looks like; takes in two vectors and merges them in ascending order, into a 3rd already extant vector
 void merge(
     std::vector<unsigned long long> *ptrL,
@@ -313,9 +319,10 @@ int main()
       << std::endl;
 
   // Uncomment the three lines below if you want to print the sorted vector when it's finished
-  // acc.swap(*(sieves[sieves.size() - 1]));
+  acc.swap(*(sieves[sieves.size() - 1]));
   // const size_t accSize = acc.size();
   // for (int i = 0; i < accSize; i++)
   //   std::clog << acc[i]);
+  trash(&acc);
   system("pause");
 }
