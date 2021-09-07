@@ -105,6 +105,7 @@ void alloc(std::vector<unsigned long long> *vect, const int ceil)
 
 int main()
 {
+  char again{};
   // Poll hardware for number of logical threads
   const unsigned int queriedCPUs{std::thread::hardware_concurrency()};
   std::clog
@@ -118,8 +119,7 @@ int main()
   int threads;
   std::cin >> yesno;
   std::clog
-    << std::endl
-    << std::endl;
+      << std::endl;
   if (yesno != 'y' && yesno != 'Y')
   {
     std::clog
@@ -141,7 +141,6 @@ int main()
       << physMem
       << " of "
       << totMem
-      << " available"
       << std::endl
       << std::endl
       << "Is this roughly correct? [y/n] ";
@@ -166,163 +165,169 @@ int main()
       << std::endl
       << std::endl;
 
-  // Declare vectors to hold the different multi-threading "promsies"
-  std::vector<std::future<void>> allocators{}, sorters{}, mergers{};
-
-  // Declare 2D vectors to hold the dynamically allocated child vectors
-  // One for the raw integers, and one for the merging phases
-  // These had to be constructed as a vector of pointers, because it seems the double-nesting of
-  // the while loop and for loop below was causing the regular vectors to be garbage collected before
-  // they could be accessed in multiple threads, so I had to heap allocate them, and inline dereferencing
-  // the heap pointers caused the same issue so it HAD to be explicit pointers
-  std::vector<std::vector<unsigned long long> *> sieves{}, vects{};
-
-  // And one final vector to hold the sorted integers when we're finished
-  std::vector<unsigned long long> acc{};
-
-  // Create a vector for each CPU thread
-  for (int i = 0; i < threads; i++)
-    vects.push_back(new std::vector<unsigned long long>{});
-
-  std::clog
-      << "Allocating vector space"
-      << std::endl
-      << std::endl;
-  // Start an absolute and per-area timer
-  const std::chrono::_V2::system_clock::time_point globalTimer{now()};
-  std::chrono::_V2::system_clock::time_point runningTimer{globalTimer};
-
-  // Spawn n - 1 futures/promises to launch n - 1 threads besides main for allocating the vector space
-  for (int i = 0; i < (threads - 1); i++)
-    allocators.push_back(std::async(std::launch::async, alloc, vects[i], totalSort / threads));
-
-  // Manually create one final allocation process on main, effectively using all n threads
-  alloc(vects[threads - 1], totalSort / threads);
-
-  // Wait for all of the allocation futures to resolve before continuing
-  for (int i = 0; i < allocators.size(); i++)
-    allocators[i].wait();
-  std::clog
-      << "Allocation completed in "
-      << timerInMS(runningTimer)
-      << " milliseconds"
-      << std::endl
-      << std::endl;
-
-  // Dump the vector of resolved allocation futures
-  std::vector<std::future<void>>{}.swap(allocators);
-
-  // Bring the timer up to date
-  syncWatch(runningTimer);
-  std::clog
-      << "Let the sorting begin..."
-      << std::endl
-      << std::endl;
-
-  // Identical process for creating the allocation threads, only for creating sorts now
-  for (int i = 0; i < (threads - 1); i++)
-    sorters.push_back(std::async(std::launch::async, sort, vects[i]));
-
-  // and one last sort right here in main
-  sort(vects[threads - 1]);
-
-  // wait for all of the sorts to resolve
-  for (int i = 0; i < sorters.size(); i++)
-    sorters[i].wait();
-
-  std::clog
-      << "Sort completed in "
-      << timerInMS(runningTimer)
-      << " milliseconds"
-      << std::endl
-      << std::endl;
-
-  std::clog
-    << "Beginning merge."
-    << std::endl
-    << "(memory usage will spike sporadically)"
-    << std::endl
-    << std::endl;
-
-  syncWatch(runningTimer);
-
-  // Here's where the fun starts
-  // Each merge takes in 2 vectors, so we only need to iterate every other thread
-  // At this point, we're guaranteed to be spawning merge threads < CPU threads, so we no longer need
-  // to do the -1/+1 trick from allocating and sorting
-  for (int i = 0; i < threads; i += 2)
+  while (again == 'y' || again == 'Y')
   {
+    // Declare vectors to hold the different multi-threading "promsies"
+    std::vector<std::future<void>> allocators{}, sorters{}, mergers{};
 
-    // Create a new vector into which we will merge the other two
-    // Creating it out here and mutating it saves difficulty with having to
-    // retrieve the value from the future later
-    sieves.push_back(new std::vector<unsigned long long>{});
+    // Declare 2D vectors to hold the dynamically allocated child vectors
+    // One for the raw integers, and one for the merging phases
+    // These had to be constructed as a vector of pointers, because it seems the double-nesting of
+    // the while loop and for loop below was causing the regular vectors to be garbage collected before
+    // they could be accessed in multiple threads, so I had to heap allocate them, and inline dereferencing
+    // the heap pointers caused the same issue so it HAD to be explicit pointers
+    std::vector<std::vector<unsigned long long> *> sieves{}, vects{};
 
-    // Spawn a merge thread
-    mergers.push_back(std::async(std::launch::async, merge, vects[i], vects[i + 1], sieves[sieves.size() - 1]));
-  }
+    // And one final vector to hold the sorted integers when we're finished
+    std::vector<unsigned long long> acc{};
 
-  // Wait for the merge threads to resolve
-  for (int i = 0; i < mergers.size(); i++)
-    mergers[i].wait();
+    // Create a vector for each CPU thread
+    for (int i = 0; i < threads; i++)
+      vects.push_back(new std::vector<unsigned long long>{});
 
-  // Preemptively create a position to track how many of the sieves we have recursively merged
-  int sPos = 0;
+    std::clog
+        << "Allocating vector space"
+        << std::endl
+        << std::endl;
+    // Start an absolute and per-area timer
+    const std::chrono::_V2::system_clock::time_point globalTimer{now()};
+    std::chrono::_V2::system_clock::time_point runningTimer{globalTimer};
 
-  // While the final sieve in the sieves container is not yet the same size as the total number of integers we're sorting,
-  // then we know that we must continue merging
-  while (sieves[sieves.size() - 1]->size() < totalSort)
-  {
+    // Spawn n - 1 futures/promises to launch n - 1 threads besides main for allocating the vector space
+    for (int i = 0; i < (threads - 1); i++)
+      allocators.push_back(std::async(std::launch::async, alloc, vects[i], totalSort / threads));
 
-    // We store the size of the sieves vector prior to pushing anything into it so that we don't loop infinitely
-    const size_t sieveSizeNow = sieves.size();
+    // Manually create one final allocation process on main, effectively using all n threads
+    alloc(vects[threads - 1], totalSort / threads);
 
-    // And also grab the size of the mergers for the same reason
-    const size_t mergeSizeNow = mergers.size();
+    // Wait for all of the allocation futures to resolve before continuing
+    for (int i = 0; i < allocators.size(); i++)
+      allocators[i].wait();
+    std::clog
+        << "Allocation completed in "
+        << timerInMS(runningTimer)
+        << " milliseconds"
+        << std::endl
+        << std::endl;
 
-    // And then loop until there are no elements at one position past where we're looking
-    // This will ensure that we only try to merge when we actually have 2 vectors
-    // available to do so; if we've previously pushed on an odd number of vectors, we'll only merge an even number, and bring
-    // in the odd one out on the next iteration of the outer while loop, when this for loop starts over
-    for (; sPos + 1 < sieveSizeNow; sPos += 2)
+    // Dump the vector of resolved allocation futures
+    std::vector<std::future<void>>{}.swap(allocators);
+
+    // Bring the timer up to date
+    syncWatch(runningTimer);
+    std::clog
+        << "Let the sorting begin..."
+        << std::endl
+        << std::endl;
+
+    // Identical process for creating the allocation threads, only for creating sorts now
+    for (int i = 0; i < (threads - 1); i++)
+      sorters.push_back(std::async(std::launch::async, sort, vects[i]));
+
+    // and one last sort right here in main
+    sort(vects[threads - 1]);
+
+    // wait for all of the sorts to resolve
+    for (int i = 0; i < sorters.size(); i++)
+      sorters[i].wait();
+
+    std::clog
+        << "Sort completed in "
+        << timerInMS(runningTimer)
+        << " milliseconds"
+        << std::endl
+        << std::endl;
+
+    std::clog
+        << "Beginning merge."
+        << std::endl
+        << "(memory usage will spike sporadically)"
+        << std::endl
+        << std::endl;
+
+    syncWatch(runningTimer);
+
+    // Here's where the fun starts
+    // Each merge takes in 2 vectors, so we only need to iterate every other thread
+    // At this point, we're guaranteed to be spawning merge threads < CPU threads, so we no longer need
+    // to do the -1/+1 trick from allocating and sorting
+    for (int i = 0; i < threads; i += 2)
     {
+
+      // Create a new vector into which we will merge the other two
+      // Creating it out here and mutating it saves difficulty with having to
+      // retrieve the value from the future later
       sieves.push_back(new std::vector<unsigned long long>{});
-      mergers.push_back(std::async(std::launch::async, merge, sieves[sPos], sieves[sPos + 1], sieves[sieves.size() - 1]));
+
+      // Spawn a merge thread
+      mergers.push_back(std::async(std::launch::async, merge, vects[i], vects[i + 1], sieves[sieves.size() - 1]));
     }
 
-    // Wait for all the merge threads to resolve
-    for (int i = mergeSizeNow; i < mergers.size(); i++)
+    // Wait for the merge threads to resolve
+    for (int i = 0; i < mergers.size(); i++)
       mergers[i].wait();
 
-    // We can (hopefully) trust the merge function to correctly trash the vectors it ingests when its done with them, so
-    // we don't have to do any memory cleanup here. There's a bit of garbage in the previous sieve positions now holding
-    // empty vectors, but it's negligible
+    // Preemptively create a position to track how many of the sieves we have recursively merged
+    int sPos = 0;
+
+    // While the final sieve in the sieves container is not yet the same size as the total number of integers we're sorting,
+    // then we know that we must continue merging
+    while (sieves[sieves.size() - 1]->size() < totalSort)
+    {
+
+      // We store the size of the sieves vector prior to pushing anything into it so that we don't loop infinitely
+      const size_t sieveSizeNow = sieves.size();
+
+      // And also grab the size of the mergers for the same reason
+      const size_t mergeSizeNow = mergers.size();
+
+      // And then loop until there are no elements at one position past where we're looking
+      // This will ensure that we only try to merge when we actually have 2 vectors
+      // available to do so; if we've previously pushed on an odd number of vectors, we'll only merge an even number, and bring
+      // in the odd one out on the next iteration of the outer while loop, when this for loop starts over
+      for (; sPos + 1 < sieveSizeNow; sPos += 2)
+      {
+        sieves.push_back(new std::vector<unsigned long long>{});
+        mergers.push_back(std::async(std::launch::async, merge, sieves[sPos], sieves[sPos + 1], sieves[sieves.size() - 1]));
+      }
+
+      // Wait for all the merge threads to resolve
+      for (int i = mergeSizeNow; i < mergers.size(); i++)
+        mergers[i].wait();
+
+      // We can (hopefully) trust the merge function to correctly trash the vectors it ingests when its done with them, so
+      // we don't have to do any memory cleanup here. There's a bit of garbage in the previous sieve positions now holding
+      // empty vectors, but it's negligible
+    }
+
+    // Theoretically, when this while loop merge has finished, we've successfully merged all of our sorts together into one massive
+    // vector, and we're finished.
+
+    std::clog
+        << "Merge completed in "
+        << timerInMS(runningTimer)
+        << " milliseconds"
+        << std::endl
+        << std::endl;
+
+    std::clog
+        << "Total operation for allocating, sorting, and merging "
+        << totalSort
+        << " unsigned long long integers completed in "
+        << timerInMS(globalTimer)
+        << " milliseconds"
+        << std::endl
+        << std::endl;
+
+    // Uncomment the three lines below if you want to print the sorted vector when it's finished
+    acc.swap(*(sieves[sieves.size() - 1]));
+    // const size_t accSize = acc.size();
+    // for (int i = 0; i < accSize; i++)
+    //   std::clog << acc[i]);
+    trash(&acc);
+    std::cout << "Run again? [y/n] ";
+    std::cin >> again;
+    std::cout << std::endl;
   }
-
-  // Theoretically, when this while loop merge has finished, we've successfully merged all of our sorts together into one massive
-  // vector, and we're finished.
-
-  std::clog
-      << "Merge completed in "
-      << timerInMS(runningTimer)
-      << " milliseconds"
-      << std::endl
-      << std::endl;
-
-  std::clog
-      << "Total operation for allocating, sorting, and merging "
-      << totalSort
-      << " unsigned long long integers completed in "
-      << timerInMS(globalTimer)
-      << " milliseconds"
-      << std::endl
-      << std::endl;
-
-  // Uncomment the three lines below if you want to print the sorted vector when it's finished
-  acc.swap(*(sieves[sieves.size() - 1]));
-  // const size_t accSize = acc.size();
-  // for (int i = 0; i < accSize; i++)
-  //   std::clog << acc[i]);
-  trash(&acc);
   system("pause");
 }
