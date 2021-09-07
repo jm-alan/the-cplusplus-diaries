@@ -24,17 +24,14 @@ namespace child_process
   {
     redi::ipstream proc(cmd, redi::pstreams::pstdout | redi::pstreams::pstderr);
     std::string line, acc;
-    // read child's stdout
     while (std::getline(proc.out(), line))
-      acc += line;
-    // if reading stdout stopped at EOF then reset the state:
+      acc += (line + '\n');
     if (proc.eof() && proc.fail())
       proc.clear();
     else
       return acc;
-    // read child's stderr
     while (std::getline(proc.err(), line))
-      acc += line;
+      acc += (line + '\n');
     return acc;
   }
 }
