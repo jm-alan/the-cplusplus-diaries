@@ -165,7 +165,7 @@ int main()
       << std::endl
       << std::endl;
 
-  while (again == 'y' || again == 'Y')
+  do
   {
     // Declare vectors to hold the different multi-threading "promsies"
     std::vector<std::future<void>> allocators{}, sorters{}, mergers{};
@@ -334,6 +334,7 @@ int main()
     std::cout << "Run again? [y/n] ";
     std::cin >> again;
     std::cout << std::endl;
-  }
+  } while (again == 'y' || again == 'Y');
+
   system("pause");
 }
