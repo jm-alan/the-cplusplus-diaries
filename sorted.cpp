@@ -157,8 +157,8 @@ int main()
   else
     mem = physMem;
   std::clog << std::endl;
-  // Rough estimate that it takes about 20mb of RAM to allocate, sort, and merge 1,000,000 unsigned long longs
-  int totalSort = (physMem / 20) * 1000000;
+  // Rough estimate that it takes about 19mb of RAM to allocate, sort, and merge 1,000,000 unsigned long longs
+  int totalSort((mem / 19) * 1000000);
   std::clog
       << "Max sortable long ints: "
       << totalSort
