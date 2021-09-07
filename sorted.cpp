@@ -310,12 +310,18 @@ int main()
         << std::endl
         << std::endl;
 
+    const auto finalTimer = timerInMS(globalTimer);
+
     std::clog
         << "Total operation for allocating, sorting, and merging "
         << totalSort
         << " unsigned long long integers completed in "
-        << timerInMS(globalTimer)
+        << finalTimer
         << " milliseconds"
+        << std::endl
+        << "for a total average rate of "
+        << totalSort / finalTimer
+        << " ints/ms"
         << std::endl
         << std::endl;
 
