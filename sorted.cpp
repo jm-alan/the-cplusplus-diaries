@@ -17,10 +17,10 @@
 #define now() std::chrono::system_clock::now()
 
 // one more for updating the timer
-#define syncWatch(runningTimer) runningTimer = now()
+#define syncWatch(timer) timer = now()
 
 // aaaaand one more for formatting the timer
-#define timerInMS(runningTimer) std::chrono::duration_cast<std::chrono::milliseconds>(now() - runningTimer).count()
+#define timerInMS(timer) std::chrono::duration_cast<std::chrono::milliseconds>(now() - timer).count()
 
 // This does what it says on the tin. I had to abstract it because for some reason
 // std::sort can't be passed directly to std::async, probably some pointer bs
