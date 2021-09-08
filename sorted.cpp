@@ -158,7 +158,8 @@ int main()
     mem = physMem;
   std::clog << std::endl;
   // Rough estimate that it takes about 19mb of RAM to allocate, sort, and merge 1,000,000 unsigned long longs
-  int totalSort((mem / 19) * 1000000);
+  int totalSort{(((mem / 19) * 1000000) / threads) * threads};
+
   std::clog
       << "Max sortable long ints: "
       << totalSort
@@ -278,13 +279,11 @@ int main()
       // We store the size of the sieves vector prior to pushing anything into it so that we don't loop infinitely
       const size_t sieveSizeNow = sieves.size();
 
-      // And also grab the size of the mergers for the same reason
-      const size_t mergeSizeNow = mergers.size();
-
       // And then loop until there are no elements at one position past where we're looking
       // This will ensure that we only try to merge when we actually have 2 vectors
       // available to do so; if we've previously pushed on an odd number of vectors, we'll only merge an even number, and bring
       // in the odd one out on the next iteration of the outer while loop, when this for loop starts over
+      std::cout << sPos << " " << sieveSizeNow << " " << sieves[sieves.size() - 1]->size() << " " << totalSort << std::endl;
       for (; sPos + 1 < sieveSizeNow; sPos += 2)
       {
         sieves.push_back(new std::vector<unsigned long long>{});
@@ -292,12 +291,12 @@ int main()
       }
 
       // Wait for all the merge threads to resolve
-      for (int i = mergeSizeNow; i < mergers.size(); i++)
+      for (int i = 0; i < mergers.size(); i++)
         mergers[i].wait();
 
       // We can (hopefully) trust the merge function to correctly trash the vectors it ingests when its done with them, so
-      // we don't have to do any memory cleanup here. There's a bit of garbage in the previous sieve positions now holding
-      // empty vectors, but it's negligible
+      // so the only memory cleanup we have to do here is dumping the merge futures once they've all resolved
+      std::vector<std::future<void>>{}.swap(mergers);
     }
 
     // Theoretically, when this while loop merge has finished, we've successfully merged all of our sorts together into one massive
