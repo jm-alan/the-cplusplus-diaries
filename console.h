@@ -1,12 +1,10 @@
-#include <cstdio>
 #include <iostream>
 #include <memory>
 #include <stdexcept>
 #include <string>
 #include <array>
-#include "./pstream.h"
 
-namespace child_process
+namespace console
 {
   std::string exec(const char *cmd)
   {
@@ -20,19 +18,10 @@ namespace child_process
     return result;
   }
 
-  std::string exec_safe(const char *cmd)
+  void pause()
   {
-    redi::ipstream proc(cmd, redi::pstreams::pstdout | redi::pstreams::pstderr);
-    std::string line, acc;
-    while (std::getline(proc.out(), line))
-      acc += (line + '\n');
-    if (proc.eof() && proc.fail())
-      proc.clear();
-    else
-      return acc;
-    while (std::getline(proc.err(), line))
-      acc += (line + '\n');
-    return acc;
+    std::cout << "Press any key to continue..." << std::endl;
+    std::cin.get();
   }
 }
 
