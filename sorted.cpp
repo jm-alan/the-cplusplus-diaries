@@ -116,8 +116,7 @@ int main()
       << "Queried available logical processors: "
       << queriedCPUs
       << std::endl
-      << std::endl;
-  std::clog
+      << std::endl
       << "Is this correct? [y/n] ";
   char yesno;
   int threads;
