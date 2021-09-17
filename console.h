@@ -18,9 +18,14 @@ namespace console
     return result;
   }
 
+  void log (const auto msg)
+  {
+    std::clog << msg << std::endl;
+  }
+
   void pause()
   {
-    std::cout << "Press any key to continue..." << std::endl;
+    std::clog << "Press any key to continue..." << std::endl;
     std::cin.get();
   }
 }
