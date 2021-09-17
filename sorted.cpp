@@ -31,7 +31,13 @@ void sort(std::vector<unsigned long long> *ptrV)
 
 void trash(std::vector<unsigned long long> *ptrV)
 {
-  std::vector<unsigned long long> vTrash;
+  std::vector<unsigned long long> vTrash{};
+  ptrV->swap(vTrash);
+}
+
+void trash(std::vector<std::future<void>> *ptrV)
+{
+  std::vector<std::future<void>> vTrash{};
   ptrV->swap(vTrash);
 }
 
@@ -68,26 +74,24 @@ void merge(
     else if (posL < sizeL)
     {
       // So we create an empty vector that will get destroyed when this frame comes off the stack
-      std::vector<unsigned long long> leftTrash{}, rightTrash{};
       // and swap its contents with the contents of the vector we know we're finished with, effectively deallocating the memory
       // when this stack frame is cleared
-      ptrR->swap(rightTrash);
+      trash(ptrR);
 
       // We iterate through the remainder of the unfinished vector
       for (; posL < sizeL; posL++)
         ptrAcc->push_back((*ptrL)[posL]);
       // and then dump its memory the same way
-      ptrL->swap(leftTrash);
+      trash(ptrL);
     }
 
     // If we get here, we know that the opposite of the above is true and we can do the same steps in reverse
     else
     {
-      std::vector<unsigned long long> leftTrash{}, rightTrash{};
-      ptrL->swap(leftTrash);
+      trash(ptrL);
       for (; posR < sizeR; posR++)
         ptrAcc->push_back((*ptrR)[posR]);
-      ptrR->swap(rightTrash);
+      trash(ptrR);
     }
   }
 }
@@ -191,8 +195,8 @@ int main()
         << std::endl
         << std::endl;
     // Start an absolute and per-area timer
-    const std::chrono::_V2::system_clock::time_point globalTimer{now()};
-    std::chrono::_V2::system_clock::time_point runningTimer{globalTimer};
+    const std::chrono::system_clock::time_point globalTimer{now()};
+    std::chrono::system_clock::time_point runningTimer{globalTimer};
 
     // Spawn n - 1 futures/promises to launch n - 1 threads besides main for allocating the vector space
     for (int i = 0; i < (threads - 1); i++)
@@ -212,7 +216,7 @@ int main()
         << std::endl;
 
     // Dump the vector of resolved allocation futures
-    std::vector<std::future<void>>{}.swap(allocators);
+    trash(&allocators);
 
     // Bring the timer up to date
     syncWatch(runningTimer);
@@ -283,7 +287,6 @@ int main()
       // This will ensure that we only try to merge when we actually have 2 vectors
       // available to do so; if we've previously pushed on an odd number of vectors, we'll only merge an even number, and bring
       // in the odd one out on the next iteration of the outer while loop, when this for loop starts over
-      std::cout << sPos << " " << sieveSizeNow << " " << sieves[sieves.size() - 1]->size() << " " << totalSort << std::endl;
       for (; sPos + 1 < sieveSizeNow; sPos += 2)
       {
         sieves.push_back(new std::vector<unsigned long long>{});
@@ -296,7 +299,7 @@ int main()
 
       // We can (hopefully) trust the merge function to correctly trash the vectors it ingests when its done with them, so
       // so the only memory cleanup we have to do here is dumping the merge futures once they've all resolved
-      std::vector<std::future<void>>{}.swap(mergers);
+      trash(&mergers);
     }
 
     // Theoretically, when this while loop merge has finished, we've successfully merged all of our sorts together into one massive
