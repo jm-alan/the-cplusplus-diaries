@@ -46,7 +46,9 @@ namespace console
 
   void pause()
   {
+    std::cout << std::flush;
     std::clog << "Press any key to continue..." << std::endl;
+    std::cout << std::flush;
     std::cin.get();
   }
 }
