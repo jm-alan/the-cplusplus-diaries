@@ -18,7 +18,12 @@ namespace console
     return result;
   }
 
-  void log (const auto msg)
+  void log(const auto msg)
+  {
+    std::clog << msg << std::endl;
+  }
+
+  void log(const auto *msg)
   {
     std::clog << msg << std::endl;
   }
