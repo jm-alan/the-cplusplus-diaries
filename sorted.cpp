@@ -1,29 +1,17 @@
-// Vectors
 #include <vector>
-// Threading/async
 #include <future>
-// Sorting
 #include <algorithm>
-// Hardware querying
 #include <windows.h>
-// Generating numbers to sort
 #include <random>
-// Timer
 #include <chrono>
-// Pause, print to screen, etc
 #include "console.h"
 
-// and a system time macro as well
 #define now() std::chrono::system_clock::now()
 
-// one more for updating the timer
 #define syncWatch(timer) timer = now()
 
-// aaaaand one more for formatting the timer
 #define timerInMS(timer) std::chrono::duration_cast<std::chrono::milliseconds>(now() - timer).count()
 
-// This does what it says on the tin. I had to abstract it because for some reason
-// std::sort can't be passed directly to std::async, probably some pointer bs
 void sort(std::vector<unsigned long long> *ptrV)
 {
   std::sort(ptrV->begin(), ptrV->end());
@@ -41,60 +29,46 @@ void trash(std::vector<std::future<void>> *ptrV)
   ptrV->swap(vTrash);
 }
 
-// Also does what it looks like; takes in two vectors and merges them in ascending order, into a 3rd already extant vector
+void trash(std::vector<std::vector<unsigned long long> *> *ptrV)
+{
+  std::vector<std::vector<unsigned long long> *> vTrash{};
+  ptrV->swap(vTrash);
+}
+
 void merge(
     std::vector<unsigned long long> *ptrL,
     std::vector<unsigned long long> *ptrR,
     std::vector<unsigned long long> *ptrAcc)
 {
-  // Immediately resize the accumulator to fit the total number of elements that will be merged into it
-  ptrAcc->resize(ptrL->size() + ptrR->size());
+  const size_t sizeL{ptrL->size()}, sizeR{ptrR->size()};
+  size_t posL{}, posR{};
 
-  size_t accPos{ptrAcc->size() - 1};
-  // If the size of both vectors is > 0
-  while (ptrL->size() || ptrR->size())
+  while (posL < sizeL || posR < sizeR)
   {
-    // If BOTH are still > 0 then we have values to compare
-    if (ptrL->size() && ptrR->size())
+    if (posL < sizeL && posR < sizeR)
     {
-      // Put the lesser of the two into the accumulator
-      if (ptrL->back() > ptrR->back())
-      {
-        (*ptrAcc)[accPos--] = ptrL->back();
-        ptrL->pop_back();
-      }
+      if ((*ptrL)[posL] < (*ptrR)[posR])
+        ptrAcc->push_back((*ptrL)[posL++]);
       else
-      {
-        (*ptrAcc)[accPos--] = ptrR->back();
-        ptrR->pop_back();
-      }
+        ptrAcc->push_back((*ptrR)[posR++]);
     }
-
-    // If we've skipped the && above, then one of the two must have finished. If it's not this one, then we know the right must
-    // have finished
-    else if (ptrL->size())
+    else if (posL < sizeL)
     {
-      // We iterate through the remainder of the unfinished vector
-      while (ptrL->size())
-      {
-        (*ptrAcc)[accPos--] = ptrL->back();
-        ptrL->pop_back();
-      }
+      trash(ptrR);
+      while (posL < sizeL)
+        ptrAcc->push_back((*ptrL)[posL++]);
+      trash(ptrL);
     }
-
-    // If we get here, we know that the opposite of the above is true and we can do the same steps for the opposite vector
     else
     {
-      while (ptrR->size())
-      {
-        (*ptrAcc)[accPos--] = ptrR->back();
-        ptrR->pop_back();
-      }
+      trash(ptrL);
+      while (posR < sizeR)
+        ptrAcc->push_back((*ptrR)[posR++]);
+      trash(ptrR);
     }
   }
 }
 
-// This fills a given vector with ceil number of random unsigned 8byte integers
 void alloc(std::vector<unsigned long long> *vect, const int ceil)
 {
   std::random_device rd;
@@ -102,18 +76,17 @@ void alloc(std::vector<unsigned long long> *vect, const int ceil)
   std::uniform_int_distribution<unsigned long long> distribution(0, 0xFFFFFFFFFFFFFFFF);
   for (int i = 0; i < ceil; i++)
     vect->push_back(distribution(generator));
-    // vect->push_back(rand());
+  // vect->push_back(rand());
 }
 
 int main()
 {
   char again{};
-  // Poll hardware for number of logical threads
   const unsigned int queriedCPUs{std::thread::hardware_concurrency()};
   console::inl("Queried available logical processors: ");
   console::log(queriedCPUs);
   console::log("Is this correct? [y/n]");
-  char yesno;
+  char yesno{};
   std::cin >> yesno;
   int threads;
   if (yesno != 'y' && yesno != 'Y')
@@ -125,49 +98,37 @@ int main()
   else
     threads = queriedCPUs;
 
-  // Use some proprietary Windows C++ library garbage to query total system memory
-  MEMORYSTATUSEX stax;
-  stax.dwLength = sizeof(stax);
-  GlobalMemoryStatusEx(&stax);
-  const int physMem = stax.ullAvailPhys / (1024 * 1024);
-  const int totMem = stax.ullTotalPhys / (1024 * 1024);
-  console::inl("Queried available memory in MB: ");
-  console::inl(physMem);
-  console::inl(" of ");
-  console::log(totMem);
-  console::log("Is this roughly correct? [y/n]");
-  std::cin >> yesno;
-  int mem;
-  if (yesno != 'y' && yesno != 'Y')
-  {
-    console::log("Please input the current amount of AVAILABLE (total - occupied) memory in your machine, in MB:");
-    std::cin >> mem;
-  }
-  else
-    mem = physMem;
-  // Rough estimate that it takes about 19mb of RAM to allocate, sort, and merge 1,000,000 unsigned long longs
-  int totalSort{(((mem / 19) * 1000000) / threads) * threads};
-
-  console::inl("Max sortable long ints: ");
-  console::log(totalSort);
-
   do
   {
-    // Declare vectors to hold the different multi-threading "promsies"
+    MEMORYSTATUSEX mstax;
+    mstax.dwLength = sizeof(mstax);
+    GlobalMemoryStatusEx(&mstax);
+    const int physMem = mstax.ullAvailPhys / (1024 * 1024);
+    const int totMem = mstax.ullTotalPhys / (1024 * 1024);
+    console::inl("Queried available memory in MB: ");
+    console::inl(physMem);
+    console::inl(" of ");
+    console::log(totMem);
+    console::log("Is this roughly correct? [y/n]");
+    std::cin >> yesno;
+    int mem;
+    if (yesno != 'y' && yesno != 'Y')
+    {
+      console::log("Please input the current amount of AVAILABLE (total - occupied) memory in your machine, in MB:");
+      std::cin >> mem;
+    }
+    else
+      mem = physMem;
+
+    int totalSort{(((mem / 19) * 1000000) / threads) * threads};
+
+    console::inl("Max sortable long ints: ");
+    console::log(totalSort);
+
     std::vector<std::future<void>> allocators{}, sorters{}, mergers{};
-
-    // Declare 2D vectors to hold the dynamically allocated child vectors
-    // One for the raw integers, and one for the merging phases
-    // These had to be constructed as a vector of pointers, because it seems the double-nesting of
-    // the while loop and for loop below was causing the regular vectors to be garbage collected before
-    // they could be accessed in multiple threads, so I had to heap allocate them, and inline dereferencing
-    // the heap pointers caused the same issue so it HAD to be explicit pointers
     std::vector<std::vector<unsigned long long> *> sieves{}, vects{};
-
-    // And one final vector to hold the sorted integers when we're finished
     std::vector<unsigned long long> acc{};
 
-    // Create a vector for each CPU thread
     for (int i = 0; i < threads; i++)
       vects.push_back(new std::vector<unsigned long long>{});
 
@@ -176,14 +137,11 @@ int main()
     const std::chrono::system_clock::time_point globalTimer{now()};
     std::chrono::system_clock::time_point runningTimer{globalTimer};
 
-    // Spawn n - 1 futures/promises to launch n - 1 threads besides main for allocating the vector space
     for (int i = 0; i < (threads - 1); i++)
       allocators.push_back(std::async(std::launch::async, alloc, vects[i], totalSort / threads));
 
-    // Manually create one final allocation process on main, effectively using all n threads
     alloc(vects[threads - 1], totalSort / threads);
 
-    // Wait for all of the allocation futures to resolve before continuing
     for (int i = 0; i < allocators.size(); i++)
       allocators[i].wait();
 
@@ -191,84 +149,52 @@ int main()
     console::inl(timerInMS(runningTimer));
     console::log(" milliseconds");
 
-    // Dump the vector of resolved allocation futures
     trash(&allocators);
 
-    // Bring the timer up to date
     syncWatch(runningTimer);
     console::log("Let the sorting begin...");
 
-    // Identical process for creating the allocation threads, only for creating sorts now
     for (int i = 0; i < (threads - 1); i++)
       sorters.push_back(std::async(std::launch::async, sort, vects[i]));
 
-    // and one last sort right here in main
     sort(vects[threads - 1]);
 
-    // wait for all of the sorts to resolve
     for (int i = 0; i < sorters.size(); i++)
       sorters[i].wait();
 
     console::inl("Sort completed in ");
     console::inl(timerInMS(runningTimer));
     console::log(" milliseconds");
-
     console::log("Beginning merge. Memory usage will spike sporadically.");
-
     syncWatch(runningTimer);
 
-    // Here's where the fun starts
-    // Each merge takes in 2 vectors, so we only need to iterate every other thread
-    // At this point, we're guaranteed to be spawning merge threads < CPU threads, so we no longer need
-    // to do the -1/+1 trick from allocating and sorting
     for (int i = 0; i < threads; i += 2)
     {
-
-      // Create a new vector into which we will merge the other two
-      // Creating it out here and mutating it saves difficulty with having to
-      // retrieve the value from the future later
       sieves.push_back(new std::vector<unsigned long long>{});
-
-      // Spawn a merge thread
       mergers.push_back(std::async(std::launch::async, merge, vects[i], vects[i + 1], sieves[sieves.size() - 1]));
     }
 
-    // Wait for the merge threads to resolve
     for (int i = 0; i < mergers.size(); i++)
       mergers[i].wait();
 
-    // Preemptively create a position to track how many of the sieves we have recursively merged
     int sPos = 0;
 
-    // While the final sieve in the sieves container is not yet the same size as the total number of integers we're sorting,
-    // then we know that we must continue merging
     while (sieves[sieves.size() - 1]->size() < totalSort)
     {
-      // We store the size of the sieves vector prior to pushing anything into it so that we don't loop infinitely
+
       const size_t sieveSizeNow = sieves.size();
 
-      // And then loop until there are no elements at one position past where we're looking
-      // This will ensure that we only try to merge when we actually have 2 vectors
-      // available to do so; if we've previously pushed on an odd number of vectors, we'll only merge an even number, and bring
-      // in the odd one out on the next iteration of the outer while loop, when this for loop starts over
       for (; sPos + 1 < sieveSizeNow; sPos += 2)
       {
         sieves.push_back(new std::vector<unsigned long long>{});
         mergers.push_back(std::async(std::launch::async, merge, sieves[sPos], sieves[sPos + 1], sieves[sieves.size() - 1]));
       }
 
-      // Wait for all the merge threads to resolve
       for (int i = 0; i < mergers.size(); i++)
         mergers[i].wait();
 
-      // We can (hopefully) trust the merge function to correctly trash the vectors it ingests when its done with them, so
-      // so the only memory cleanup we have to do here is dumping the merge futures once they've all resolved
       trash(&mergers);
     }
-
-    // Theoretically, when this while loop merge has finished, we've successfully merged all of our sorts together into one massive
-    // vector, and we're finished.
-
     console::log("Merge completed in");
     console::log(timerInMS(runningTimer));
     console::log("milliseconds");
@@ -282,11 +208,12 @@ int main()
     console::log(totalSort / finalTimer);
     console::log("ints/ms");
 
-    // Uncomment the three lines below if you want to print the sorted vector when it's finished
     acc.swap(*(sieves[sieves.size() - 1]));
-    const size_t accSize = acc.size();
-    for (int i = 0; i < accSize; i++)
-      console::log(acc[i]);
+    // Uncomment the three lines below if you want to print the sorted vector when it's finished
+    // const size_t accSize = acc.size();
+    // for (int i = 0; i < accSize; i++)
+    //   console::log(acc[i]);
+    trash(&sieves);
     trash(&acc);
     console::log("Run again? [y/n] ");
     std::cin >> again;
