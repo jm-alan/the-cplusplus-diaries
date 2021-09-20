@@ -100,6 +100,7 @@ int main()
 
   do
   {
+    yesno = 0;
     MEMORYSTATUSEX mstax;
     mstax.dwLength = sizeof(mstax);
     GlobalMemoryStatusEx(&mstax);
