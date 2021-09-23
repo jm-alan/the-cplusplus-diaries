@@ -1,4 +1,5 @@
 #include <iostream>
+#include <iomanip>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -42,6 +43,11 @@ namespace console
   void log(const auto *msg)
   {
     std::clog << msg << std::endl;
+  }
+
+  void setprecision(const unsigned long long p)
+  {
+    std::cout << std::setprecision(p);
   }
 
   void pause()
