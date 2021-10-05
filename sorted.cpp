@@ -42,6 +42,7 @@ void merge(
 {
   const size_t sizeL{ptrL->size()}, sizeR{ptrR->size()};
   size_t posL{}, posR{};
+  ptrAcc->reserve(sizeL + sizeR);
 
   while (posL < sizeL || posR < sizeR)
   {
@@ -74,8 +75,9 @@ void alloc(std::vector<unsigned long long> *vect, const int ceil)
   std::random_device rd;
   std::default_random_engine generator(rd());
   std::uniform_int_distribution<unsigned long long> distribution(0, 0xFFFFFFFFFFFFFFFF);
+  vect->reserve(ceil);
   for (int i = 0; i < ceil; i++)
-    vect->push_back(distribution(generator));
+    vect->emplace_back(distribution(generator));
   // vect->push_back(rand());
 }
 
@@ -101,18 +103,18 @@ int main()
   do
   {
     yesno = 0;
-    MEMORYSTATUSEX mstax;
+    MEMORYSTATUSEX mstax{};
     mstax.dwLength = sizeof(mstax);
     GlobalMemoryStatusEx(&mstax);
-    const int physMem = mstax.ullAvailPhys / (1024 * 1024);
-    const int totMem = mstax.ullTotalPhys / (1024 * 1024);
+    const int physMem{mstax.ullAvailPhys / (1024 * 1024)};
+    const int totMem{mstax.ullTotalPhys / (1024 * 1024)};
     console::inl("Queried available memory in MB: ");
     console::inl(physMem);
     console::inl(" of ");
     console::log(totMem);
     console::log("Is this roughly correct? [y/n]");
     std::cin >> yesno;
-    int mem;
+    int mem{};
     if (yesno != 'y' && yesno != 'Y')
     {
       console::log("Please input the current amount of AVAILABLE (total - occupied) memory in your machine, in MB:");
@@ -121,7 +123,7 @@ int main()
     else
       mem = physMem;
 
-    int totalSort{(((mem / 19) * 1000000) / threads) * threads};
+    int totalSort{(((mem / 16) * 1000000) / threads) * threads};
 
     console::inl("Max sortable long ints: ");
     console::log(totalSort);
@@ -131,7 +133,7 @@ int main()
     std::vector<unsigned long long> acc{};
 
     for (int i = 0; i < threads; i++)
-      vects.push_back(new std::vector<unsigned long long>{});
+      vects.emplace_back(new std::vector<unsigned long long>{});
 
     console::log("Allocating vector space");
     // Start an absolute and per-area timer
@@ -139,7 +141,7 @@ int main()
     std::chrono::system_clock::time_point runningTimer{globalTimer};
 
     for (int i = 0; i < (threads - 1); i++)
-      allocators.push_back(std::async(std::launch::async, alloc, vects[i], totalSort / threads));
+      allocators.emplace_back(std::async(std::launch::async, alloc, vects[i], totalSort / threads));
 
     alloc(vects[threads - 1], totalSort / threads);
 
@@ -156,7 +158,7 @@ int main()
     console::log("Let the sorting begin...");
 
     for (int i = 0; i < (threads - 1); i++)
-      sorters.push_back(std::async(std::launch::async, sort, vects[i]));
+      sorters.emplace_back(std::async(std::launch::async, sort, vects[i]));
 
     sort(vects[threads - 1]);
 
@@ -171,8 +173,8 @@ int main()
 
     for (int i = 0; i < threads; i += 2)
     {
-      sieves.push_back(new std::vector<unsigned long long>{});
-      mergers.push_back(std::async(std::launch::async, merge, vects[i], vects[i + 1], sieves[sieves.size() - 1]));
+      sieves.emplace_back(new std::vector<unsigned long long>{});
+      mergers.emplace_back(std::async(std::launch::async, merge, vects[i], vects[i + 1], sieves[sieves.size() - 1]));
     }
 
     for (int i = 0; i < mergers.size(); i++)
@@ -187,8 +189,8 @@ int main()
 
       for (; sPos + 1 < sieveSizeNow; sPos += 2)
       {
-        sieves.push_back(new std::vector<unsigned long long>{});
-        mergers.push_back(std::async(std::launch::async, merge, sieves[sPos], sieves[sPos + 1], sieves[sieves.size() - 1]));
+        sieves.emplace_back(new std::vector<unsigned long long>{});
+        mergers.emplace_back(std::async(std::launch::async, merge, sieves[sPos], sieves[sPos + 1], sieves[sieves.size() - 1]));
       }
 
       for (int i = 0; i < mergers.size(); i++)
@@ -196,18 +198,17 @@ int main()
 
       trash(&mergers);
     }
-    console::log("Merge completed in");
-    console::log(timerInMS(runningTimer));
+    console::inl("Merge completed in");
+    console::inl(timerInMS(runningTimer));
     console::log("milliseconds");
 
     const auto finalTimer = timerInMS(globalTimer);
 
     console::log("Total operation for allocating, sorting, and merging completed in");
-    console::log(finalTimer);
-    console::log("milliseconds");
-    console::log("for a total average rate of");
-    console::log(totalSort / finalTimer);
-    console::log("ints/ms");
+    console::inl(finalTimer);
+    console::inl(" milliseconds, for a total average rate of ");
+    console::inl(totalSort / finalTimer);
+    console::log(" ints/ms");
 
     acc.swap(*(sieves[sieves.size() - 1]));
     // Uncomment the three lines below if you want to print the sorted vector when it's finished
@@ -220,6 +221,4 @@ int main()
     std::cin >> again;
     std::cout << std::endl;
   } while (again == 'y' || again == 'Y');
-
-  console::pause();
 }
