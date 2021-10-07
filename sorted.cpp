@@ -1,5 +1,6 @@
 #include <vector>
 #include <future>
+#include <mutex>
 #include <algorithm>
 #include <windows.h>
 #include <random>
@@ -12,9 +13,11 @@
 
 #define timerInMS(timer) std::chrono::duration_cast<std::chrono::milliseconds>(now() - timer).count()
 
-void sort(std::vector<unsigned long long> *ptrV)
+void sort(std::vector<unsigned long long> *ptrV, std::mutex *lockV)
 {
+  lockV->lock();
   std::sort(ptrV->begin(), ptrV->end());
+  lockV->unlock();
 }
 
 void trash(std::vector<unsigned long long> *ptrV)
@@ -33,6 +36,18 @@ void trash(std::vector<std::vector<unsigned long long> *> *ptrV)
 {
   std::vector<std::vector<unsigned long long> *> vTrash{};
   ptrV->swap(vTrash);
+}
+
+void alloc(std::vector<unsigned long long> *allocV, const int ceil, std::mutex *lockV)
+{
+  std::random_device rd;
+  std::default_random_engine generator(rd());
+  std::uniform_int_distribution<unsigned long long> distribution(0, 0xFFFFFFFFFFFFFFFF);
+  allocV->reserve(ceil);
+  for (int i = 0; i < ceil; i++)
+    allocV->emplace_back(distribution(generator));
+  // vect->push_back(rand());
+  lockV->unlock();
 }
 
 void merge(
@@ -70,16 +85,6 @@ void merge(
   }
 }
 
-void alloc(std::vector<unsigned long long> *vect, const int ceil)
-{
-  std::random_device rd;
-  std::default_random_engine generator(rd());
-  std::uniform_int_distribution<unsigned long long> distribution(0, 0xFFFFFFFFFFFFFFFF);
-  vect->reserve(ceil);
-  for (int i = 0; i < ceil; i++)
-    vect->emplace_back(distribution(generator));
-  // vect->push_back(rand());
-}
 
 int main()
 {
@@ -90,7 +95,7 @@ int main()
   console::log("Is this correct? [y/n]");
   char yesno{};
   std::cin >> yesno;
-  int threads;
+  unsigned long long threads;
   if (yesno != 'y' && yesno != 'Y')
   {
     console::log("Please input the correct number of threads available on your machine: ");
@@ -106,15 +111,15 @@ int main()
     MEMORYSTATUSEX mstax{};
     mstax.dwLength = sizeof(mstax);
     GlobalMemoryStatusEx(&mstax);
-    const int physMem{mstax.ullAvailPhys / (1024 * 1024)};
-    const int totMem{mstax.ullTotalPhys / (1024 * 1024)};
+    const unsigned long long physMem{mstax.ullAvailPhys / (1024 * 1024)};
+    const unsigned long long totMem{mstax.ullTotalPhys / (1024 * 1024)};
     console::inl("Queried available memory in MB: ");
     console::inl(physMem);
     console::inl(" of ");
     console::log(totMem);
     console::log("Is this roughly correct? [y/n]");
     std::cin >> yesno;
-    int mem{};
+    unsigned long long mem{};
     if (yesno != 'y' && yesno != 'Y')
     {
       console::log("Please input the current amount of AVAILABLE (total - occupied) memory in your machine, in MB:");
@@ -123,46 +128,37 @@ int main()
     else
       mem = physMem;
 
-    int totalSort{(((mem / 16) * 1000000) / threads) * threads};
+    const unsigned long long totalSort{(((mem / 16) * 1000000) / threads) * threads};
+    // const int totalSort{(1000 / threads) * threads};
 
     console::inl("Max sortable long ints: ");
     console::log(totalSort);
 
+    std::vector<std::mutex *> locks{};
     std::vector<std::future<void>> allocators{}, sorters{}, mergers{};
     std::vector<std::vector<unsigned long long> *> sieves{}, vects{};
     std::vector<unsigned long long> acc{};
 
     for (int i = 0; i < threads; i++)
+    {
       vects.emplace_back(new std::vector<unsigned long long>{});
+      locks.emplace_back(new std::mutex{});
+    }
 
-    console::log("Allocating vector space");
     // Start an absolute and per-area timer
     const std::chrono::system_clock::time_point globalTimer{now()};
     std::chrono::system_clock::time_point runningTimer{globalTimer};
 
-    for (int i = 0; i < (threads - 1); i++)
-      allocators.emplace_back(std::async(std::launch::async, alloc, vects[i], totalSort / threads));
+    for (int i{}; i < threads; i++)
+    {
+      locks[i]->lock();
+      allocators.emplace_back(std::async(std::launch::async, alloc, vects[i], totalSort / threads, locks[i]));
+    }
 
-    alloc(vects[threads - 1], totalSort / threads);
+    for (int i{}; i < threads; i++)
+      sorters.emplace_back(std::async(std::launch::async, sort, vects[i], locks[i]));
 
-    for (int i = 0; i < allocators.size(); i++)
-      allocators[i].wait();
-
-    console::inl("Allocation completed in ");
-    console::inl(timerInMS(runningTimer));
-    console::log(" milliseconds");
-
-    trash(&allocators);
-
-    syncWatch(runningTimer);
-    console::log("Let the sorting begin...");
-
-    for (int i = 0; i < (threads - 1); i++)
-      sorters.emplace_back(std::async(std::launch::async, sort, vects[i]));
-
-    sort(vects[threads - 1]);
-
-    for (int i = 0; i < sorters.size(); i++)
+    for (int i{}; i < sorters.size(); i++)
       sorters[i].wait();
 
     console::inl("Sort completed in ");
@@ -198,9 +194,10 @@ int main()
 
       trash(&mergers);
     }
-    console::inl("Merge completed in");
+
+    console::inl("Merge completed in ");
     console::inl(timerInMS(runningTimer));
-    console::log("milliseconds");
+    console::log(" milliseconds");
 
     const auto finalTimer = timerInMS(globalTimer);
 
@@ -212,9 +209,9 @@ int main()
 
     acc.swap(*(sieves[sieves.size() - 1]));
     // Uncomment the three lines below if you want to print the sorted vector when it's finished
-    // const size_t accSize = acc.size();
-    // for (int i = 0; i < accSize; i++)
-    //   console::log(acc[i]);
+    const size_t accSize = acc.size();
+    for (int i = 0; i < accSize; i++)
+      console::log(acc[i]);
     trash(&sieves);
     trash(&acc);
     console::log("Run again? [y/n] ");
