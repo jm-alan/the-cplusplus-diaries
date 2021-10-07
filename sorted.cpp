@@ -53,8 +53,13 @@ void alloc(std::vector<unsigned long long> *allocV, const int ceil, std::mutex *
 void merge(
     std::vector<unsigned long long> *ptrL,
     std::vector<unsigned long long> *ptrR,
-    std::vector<unsigned long long> *ptrAcc)
+    std::vector<unsigned long long> *ptrAcc,
+    std::mutex *lockL,
+    std::mutex *lockR,
+    std::mutex *lockAcc)
 {
+  lockL->lock();
+  lockR->lock();
   const size_t sizeL{ptrL->size()}, sizeR{ptrR->size()};
   size_t posL{}, posR{};
   ptrAcc->reserve(sizeL + sizeR);
@@ -83,8 +88,10 @@ void merge(
       trash(ptrR);
     }
   }
+  lockL->unlock();
+  lockR->unlock();
+  lockAcc->unlock();
 }
-
 
 int main()
 {
@@ -134,7 +141,7 @@ int main()
     console::inl("Max sortable long ints: ");
     console::log(totalSort);
 
-    std::vector<std::mutex *> locks{};
+    std::vector<std::mutex *> locksV{}, locksS;
     std::vector<std::future<void>> allocators{}, sorters{}, mergers{};
     std::vector<std::vector<unsigned long long> *> sieves{}, vects{};
     std::vector<unsigned long long> acc{};
@@ -142,7 +149,7 @@ int main()
     for (int i = 0; i < threads; i++)
     {
       vects.emplace_back(new std::vector<unsigned long long>{});
-      locks.emplace_back(new std::mutex{});
+      locksV.emplace_back(new std::mutex{});
     }
 
     // Start an absolute and per-area timer
@@ -151,17 +158,17 @@ int main()
 
     for (int i{}; i < threads; i++)
     {
-      locks[i]->lock();
-      allocators.emplace_back(std::async(std::launch::async, alloc, vects[i], totalSort / threads, locks[i]));
+      locksV[i]->lock();
+      allocators.emplace_back(std::async(std::launch::async, alloc, vects[i], totalSort / threads, locksV[i]));
     }
 
     for (int i{}; i < threads; i++)
-      sorters.emplace_back(std::async(std::launch::async, sort, vects[i], locks[i]));
+      sorters.emplace_back(std::async(std::launch::async, sort, vects[i], locksV[i]));
 
     for (int i{}; i < sorters.size(); i++)
       sorters[i].wait();
 
-    console::inl("Sort completed in ");
+    console::inl("Allocate and sort completed in ");
     console::inl(timerInMS(runningTimer));
     console::log(" milliseconds");
     console::log("Beginning merge. Memory usage will spike sporadically.");
@@ -170,27 +177,24 @@ int main()
     for (int i = 0; i < threads; i += 2)
     {
       sieves.emplace_back(new std::vector<unsigned long long>{});
-      mergers.emplace_back(std::async(std::launch::async, merge, vects[i], vects[i + 1], sieves[sieves.size() - 1]));
+      locksS.emplace_back(new std::mutex{});
+      locksS[locksS.size() - 1]->lock();
+      mergers.emplace_back(std::async(std::launch::async, merge, vects[i], vects[i + 1], sieves[sieves.size() - 1], locksV[i], locksV[i + 1], locksS[locksS.size() - 1]));
     }
-
-    for (int i = 0; i < mergers.size(); i++)
-      mergers[i].wait();
 
     int sPos = 0;
 
     while (sieves[sieves.size() - 1]->size() < totalSort)
     {
-
       const size_t sieveSizeNow = sieves.size();
 
       for (; sPos + 1 < sieveSizeNow; sPos += 2)
       {
         sieves.emplace_back(new std::vector<unsigned long long>{});
-        mergers.emplace_back(std::async(std::launch::async, merge, sieves[sPos], sieves[sPos + 1], sieves[sieves.size() - 1]));
+        locksS.emplace_back(new std::mutex{});
+        locksS[locksS.size() - 1]->lock();
+        mergers.emplace_back(std::async(std::launch::async, merge, sieves[sPos], sieves[sPos + 1], sieves[sieves.size() - 1], locksS[sPos], locksS[sPos + 1], locksS[locksS.size() - 1]));
       }
-
-      for (int i = 0; i < mergers.size(); i++)
-        mergers[i].wait();
 
       trash(&mergers);
     }
@@ -208,11 +212,11 @@ int main()
     console::log(" ints/ms");
 
     acc.swap(*(sieves[sieves.size() - 1]));
-    // Uncomment the three lines below if you want to print the sorted vector when it's finished
-    const size_t accSize = acc.size();
-    for (int i = 0; i < accSize; i++)
-      console::log(acc[i]);
     trash(&sieves);
+    // Uncomment the three lines below if you want to print the sorted vector when it's finished
+    // const size_t accSize = acc.size();
+    // for (int i = 0; i < accSize; i++)
+    //   console::log(acc[i]);
     trash(&acc);
     console::log("Run again? [y/n] ");
     std::cin >> again;
