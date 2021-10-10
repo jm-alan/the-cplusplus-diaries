@@ -44,13 +44,13 @@ public:
     delete ptrL;
     delete ptrR;
   };
-  static void merge(
+  static void threadmerge(
       List *ptrL,
       List *ptrR,
       List *ptrAcc,
-      std::shared_ptr<std::mutex> lockL,
-      std::shared_ptr<std::mutex> lockR,
-      std::shared_ptr<std::mutex> lockAcc)
+      std::mutex *lockL,
+      std::mutex *lockR,
+      std::mutex *lockAcc)
   {
     std::lock_guard<std::mutex> guardL{*lockL}, guardR{*lockR};
     while (ptrL->length && ptrR->length)
