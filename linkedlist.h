@@ -1,6 +1,4 @@
-#include "console.h"
-
-void lMergeUnthreaded(List *, List *, List *);
+#include <mutex>
 
 class Node
 {
@@ -27,6 +25,49 @@ public:
 class List
 {
 public:
+  static void merge(
+      List *ptrL,
+      List *ptrR,
+      List *ptrAcc)
+  {
+    while (ptrL->length && ptrR->length)
+    {
+      if (ptrL->head->val < ptrR->head->val)
+        ptrAcc->push(ptrL->shift());
+      else
+        ptrAcc->push(ptrR->shift());
+      while (ptrL->length)
+        ptrAcc->push(ptrL->shift());
+      while (ptrR->length)
+        ptrAcc->push(ptrR->shift());
+    }
+    delete ptrL;
+    delete ptrR;
+  };
+  static void merge(
+      List *ptrL,
+      List *ptrR,
+      List *ptrAcc,
+      std::shared_ptr<std::mutex> lockL,
+      std::shared_ptr<std::mutex> lockR,
+      std::shared_ptr<std::mutex> lockAcc)
+  {
+    std::lock_guard<std::mutex> guardL{*lockL}, guardR{*lockR};
+    while (ptrL->length && ptrR->length)
+    {
+      if (ptrL->head->val < ptrR->head->val)
+        ptrAcc->push(ptrL->shift());
+      else
+        ptrAcc->push(ptrR->shift());
+      while (ptrL->length)
+        ptrAcc->push(ptrL->shift());
+      while (ptrR->length)
+        ptrAcc->push(ptrR->shift());
+    }
+    lockAcc->unlock();
+    delete ptrL;
+    delete ptrR;
+  }
   Node *head;
   Node *tail;
   unsigned long long length;
@@ -109,7 +150,7 @@ public:
     this->length = 0;
     lAcc->sort();
     rAcc->sort();
-    lMergeUnthreaded(lAcc, rAcc, this);
+    List::merge(lAcc, rAcc, this);
   }
   friend auto operator<<(std::ostream &os, List const *ptrL) -> std::ostream &
   {
