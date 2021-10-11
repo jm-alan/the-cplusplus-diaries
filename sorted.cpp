@@ -7,9 +7,9 @@
 #include <random>
 #include <chrono>
 #include <string>
-#include "include/fmt/format.h"
-#include "include/console.h"
-#include "include/linkedlist.h"
+#include <fmt/format.h>
+#include <console.h>
+#include <linkedlist.h>
 
 #define now() std::chrono::system_clock::now()
 
