@@ -65,10 +65,10 @@ public:
         ptrAcc->pushNode(ptrR->shift());
       }
     }
-      while (ptrL->length)
-        ptrAcc->pushNode(ptrL->shift());
-      while (ptrR->length)
-        ptrAcc->pushNode(ptrR->shift());
+    while (ptrL->length)
+      ptrAcc->pushNode(ptrL->shift());
+    while (ptrR->length)
+      ptrAcc->pushNode(ptrR->shift());
     lockAcc->unlock();
     delete ptrL;
     delete ptrR;
