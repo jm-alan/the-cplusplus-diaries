@@ -97,7 +97,7 @@ int main()
     std::cin >> mem;
   }
 
-  const unsigned long long totalSort{(((mem / 50) * 1000000) / threads) * threads};
+  const unsigned long long totalSort{(((mem / 32) * 1000000) / threads) * threads};
   // const unsigned long long totalSort{(1000 / threads) * threads};
 
   console::inl("Max sortable long ints: ");
