@@ -1,12 +1,15 @@
+#define FMT_HEADER_ONLY
+
 #include <vector>
 #include <future>
-#include <memory>
 #include <mutex>
 #include <windows.h>
 #include <random>
 #include <chrono>
-#include "console.h"
-#include "linkedlist.h"
+#include <string>
+#include "include/fmt/format.h"
+#include "include/console.h"
+#include "include/linkedlist.h"
 
 #define now() std::chrono::system_clock::now()
 
@@ -17,21 +20,21 @@
 void alloc(
     List *ptrL,
     const unsigned long long ceil,
-    std::shared_ptr<std::mutex> lockAlloc)
+    std::mutex *lockAlloc)
 {
   std::random_device rd;
   std::default_random_engine generator{rd()};
   std::uniform_int_distribution<unsigned long long> distribution{0, 0xFFFFFFFFFFFFFFFF};
   for (int i{}; i < ceil; i++)
-    ptrL->push(distribution(generator));
+    ptrL->pushVal(distribution(generator));
   // vect->push_back(rand());
   lockAlloc->unlock();
 };
 
 void sort(
     List *ptrL,
-    std::shared_ptr<std::mutex> lockAlloc,
-    std::shared_ptr<std::mutex> lockSort)
+    std::mutex *lockAlloc,
+    std::mutex *lockSort)
 {
   std::lock_guard<std::mutex> guardL{*lockAlloc};
   ptrL->sort();
@@ -42,11 +45,12 @@ void merge(
     List *ptrL,
     List *ptrR,
     List *ptrAcc,
-    std::shared_ptr<std::mutex> lockL,
-    std::shared_ptr<std::mutex> lockR,
-    std::shared_ptr<std::mutex> lockAcc)
+    std::mutex *lockL,
+    std::mutex *lockR,
+    std::mutex *lockAcc)
 {
-  List::merge(ptrL, ptrR, ptrAcc, lockL, lockR, lockAcc);
+  List::threadmerge(ptrL, ptrR, ptrAcc, lockL, lockR);
+  lockAcc->unlock();
 }
 
 int main()
@@ -58,15 +62,23 @@ int main()
   console::log("Is this correct? [y/n]");
   char yesno{};
   std::cin >> yesno;
-  unsigned long long threads;
+  unsigned long long threads{queriedCPUs};
   if (yesno != 'y' && yesno != 'Y')
   {
     console::log("Please input the correct number of threads available on your machine: ");
     std::cin >>
         threads;
   }
-  else
-    threads = queriedCPUs;
+
+  unsigned long long countSteps{};
+  unsigned long long threadsToMerge{threads};
+  while (threadsToMerge > 1)
+  {
+    countSteps++;
+    threadsToMerge /= 2;
+    if (threadsToMerge > 2 && threadsToMerge % 2)
+      countSteps++;
+  }
 
   do
   {
@@ -91,20 +103,15 @@ int main()
     else
       mem = physMem;
 
-    // const unsigned long long totalSort{(((mem / 16) * 1000000) / threads) * threads};
-    const unsigned long long totalSort{(100 / threads) * threads};
+    const unsigned long long totalSort{(((mem / 100) * 1000000) / threads) * threads};
+    // const unsigned long long totalSort{(1000 / threads) * threads};
 
     console::inl("Max sortable long ints: ");
     console::log(totalSort);
 
-    std::vector<std::shared_ptr<std::mutex>> locksAlloc, locksSorts{}, locksSieves{};
+    std::vector<std::mutex *> locksAlloc, locksSorts{}, locksSieves{};
     std::vector<std::future<void>> allocators{}, sorters{}, mergers{};
     std::vector<List *> sieves{}, lists{};
-
-    for (int i{}; i < threads; i++)
-    {
-      lists.push_back(new List());
-    }
 
     // Start an absolute and per-area timer
     const std::chrono::system_clock::time_point globalTimer{now()};
@@ -112,14 +119,15 @@ int main()
 
     for (int i{}; i < threads; i++)
     {
-      locksAlloc.push_back(std::make_shared<std::mutex>());
+      lists.push_back(new List());
+      locksAlloc.push_back(new std::mutex);
       locksAlloc[i]->lock();
       allocators.push_back(std::async(std::launch::async, alloc, lists[i], totalSort / threads, locksAlloc[i]));
     }
 
     for (int i{}; i < threads; i++)
     {
-      locksSorts.push_back(std::make_shared<std::mutex>());
+      locksSorts.push_back(new std::mutex);
       locksSorts[i]->lock();
       sorters.push_back(std::async(std::launch::async, sort, lists[i], locksAlloc[i], locksSorts[i]));
     }
@@ -127,25 +135,46 @@ int main()
     for (int i{}; i < threads; i += 2)
     {
       sieves.push_back(new List());
-      locksSieves.push_back(std::make_shared<std::mutex>());
+      locksSieves.push_back(new std::mutex);
       locksSieves[locksSieves.size() - 1]->lock();
-      mergers.push_back(std::async(std::launch::async, merge, lists[i], lists[i + 1], sieves[sieves.size() - 1], locksSorts[i], locksSorts[i + 1], locksSieves[locksSieves.size() - 1]));
+      mergers.push_back(std::async(
+          std::launch::async,
+          merge,
+          lists[i],
+          lists[i + 1],
+          sieves[sieves.size() - 1],
+          locksSorts[i],
+          locksSorts[i + 1],
+          locksSieves[locksSieves.size() - 1]));
     }
 
     int sPos{};
+    int timesMerged{};
 
-    while (sieves[sieves.size() - 1]->length < totalSort)
+    while (timesMerged < countSteps)
     {
+      timesMerged++;
       const size_t sieveSizeNow = sieves.size();
 
       for (; sPos + 1 < sieveSizeNow; sPos += 2)
       {
         sieves.push_back(new List());
-        locksSieves.push_back(std::make_shared<std::mutex>());
+        locksSieves.push_back(new std::mutex);
         locksSieves[locksSieves.size() - 1]->lock();
-        mergers.push_back(std::async(std::launch::async, merge, sieves[sPos], sieves[sPos + 1], sieves[sieves.size() - 1], locksSieves[sPos], locksSieves[sPos + 1], locksSieves[locksSieves.size() - 1]));
+        mergers.push_back(std::async(
+            std::launch::async,
+            merge,
+            sieves[sPos],
+            sieves[sPos + 1],
+            sieves[sieves.size() - 1],
+            locksSieves[sPos],
+            locksSieves[sPos + 1],
+            locksSieves[locksSieves.size() - 1]));
       }
     }
+
+    for (int i = 0; i < mergers.size(); i++)
+      mergers[i].wait();
 
     console::inl("Merge completed in ");
     console::inl(timerInMS(runningTimer));
@@ -160,9 +189,17 @@ int main()
     console::log(" ints/ms");
 
     // Uncomment the lines below if you want to print the sorted vector when it's finished
-    const List *finL{sieves[sieves.size() - 1]};
-    console::log(finL);
-    delete finL;
+    // const List *finL{sieves[sieves.size() - 1]};
+    // Node *current = finL->head;
+    // if (current != nullptr)
+    //   console::log(current->val);
+    // while (current != nullptr)
+    // {
+    //   console::log(current->val);
+    //   current = current->next;
+    // }
+    // delete finL;
+      delete sieves[sieves.size() - 1];
     console::log("Run again? [y/n] ");
     std::cin >> again;
     std::cout << std::endl;
