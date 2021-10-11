@@ -25,6 +25,9 @@ public:
 class List
 {
 public:
+  Node *head;
+  Node *tail;
+  unsigned long long length;
   static void merge(
       List *ptrL,
       List *ptrR,
@@ -33,14 +36,14 @@ public:
     while (ptrL->length && ptrR->length)
     {
       if (ptrL->head->val < ptrR->head->val)
-        ptrAcc->push(ptrL->shift());
+        ptrAcc->pushNode(ptrL->shift());
       else
-        ptrAcc->push(ptrR->shift());
-      while (ptrL->length)
-        ptrAcc->push(ptrL->shift());
-      while (ptrR->length)
-        ptrAcc->push(ptrR->shift());
+        ptrAcc->pushNode(ptrR->shift());
     }
+    while (ptrL->length)
+      ptrAcc->pushNode(ptrL->shift());
+    while (ptrR->length)
+      ptrAcc->pushNode(ptrR->shift());
     delete ptrL;
     delete ptrR;
   };
@@ -56,30 +59,29 @@ public:
     while (ptrL->length && ptrR->length)
     {
       if (ptrL->head->val < ptrR->head->val)
-        ptrAcc->push(ptrL->shift());
+        ptrAcc->pushNode(ptrL->shift());
       else
-        ptrAcc->push(ptrR->shift());
-      while (ptrL->length)
-        ptrAcc->push(ptrL->shift());
-      while (ptrR->length)
-        ptrAcc->push(ptrR->shift());
+      {
+        ptrAcc->pushNode(ptrR->shift());
+      }
     }
+      while (ptrL->length)
+        ptrAcc->pushNode(ptrL->shift());
+      while (ptrR->length)
+        ptrAcc->pushNode(ptrR->shift());
     lockAcc->unlock();
     delete ptrL;
     delete ptrR;
   }
-  Node *head;
-  Node *tail;
-  unsigned long long length;
   List()
   {
     this->head = nullptr;
     this->tail = nullptr;
     this->length = 0;
   };
-  unsigned long long push(Node *ptrOn)
+  unsigned long long pushNode(Node *ptrOn)
   {
-    if (this->tail)
+    if (this->tail != nullptr)
     {
       this->tail->append(ptrOn);
       this->tail = this->tail->next;
@@ -89,12 +91,13 @@ public:
       this->tail = ptrOn;
       this->head = this->tail;
     }
-    return ++this->length;
+    this->length = this->length + 1;
+    return this->length;
   };
-  unsigned long long push(const unsigned long long on)
+  unsigned long long pushVal(const unsigned long long on)
   {
-    Node *ptrOn = new Node(on);
-    if (this->tail)
+    Node *ptrOn{new Node(on)};
+    if (this->tail != nullptr)
     {
       this->tail->append(ptrOn);
       this->tail = this->tail->next;
@@ -104,24 +107,31 @@ public:
       this->tail = ptrOn;
       this->head = this->tail;
     }
-    return ++this->length;
+    this->length = this->length + 1;
+    return this->length;
   };
   Node *shift()
   {
     if (this->head == nullptr)
       return this->head;
     Node *staging{this->head};
-    this->head = this->head->prev;
+    this->head = this->head->next;
     if (this->head)
       this->head->prev = nullptr;
     else
       this->tail = nullptr;
     staging->prev = nullptr;
     staging->next = nullptr;
-    if (--this->length == 1)
+    this->length = this->length - 1;
+    if (this->length == 1)
     {
       this->tail = this->head;
       this->head->prev = nullptr;
+    }
+    else if (this->length == 0)
+    {
+      this->head = nullptr;
+      this->tail = nullptr;
     }
     return staging;
   };
@@ -129,58 +139,30 @@ public:
   {
     if (this->length < 2)
       return;
-    const unsigned long long mid{this->length / 2}, leftLength{mid}, rightLength{this->length - mid};
-    List *lAcc{new List()}, *rAcc{new List()};
-    int currPos{1};
+    const unsigned long long half{this->length / 2};
+    const unsigned long long leftLength{half};
+    const unsigned long long rightLength{this->length - half};
+    unsigned long long currPos{1};
     Node *current{this->head};
-    while (++currPos <= leftLength && current != nullptr && current->next != nullptr)
+    List *left{new List()}, *right{new List()};
+    left->head = current;
+    while (++currPos <= leftLength)
       current = current->next;
-    lAcc->tail = current;
-    lAcc->length = leftLength;
+    left->tail = current;
+    left->length = leftLength;
     currPos = 1;
-    if (current)
+    if (current != nullptr)
       current = current->next;
-    rAcc->head = current;
-    while (++currPos <= rightLength && current != nullptr && current->next != nullptr)
+    right->head = current;
+    while (++currPos <= rightLength)
       current = current->next;
-    rAcc->tail = current;
-    rAcc->length = rightLength;
+    right->tail = current;
+    right->length = rightLength;
     this->head = nullptr;
     this->tail = nullptr;
     this->length = 0;
-    lAcc->sort();
-    rAcc->sort();
-    List::merge(lAcc, rAcc, this);
-  }
-  friend auto operator<<(std::ostream &os, List const *ptrL) -> std::ostream &
-  {
-    if (ptrL->length == 0)
-    {
-      console::log("{");
-      console::log("  head: NULL");
-      console::log("  tail: NULL");
-      console::log("  length: 0");
-      console::log("  run: []");
-      console::log("}");
-    }
-    else
-    {
-      Node *current = ptrL->head;
-      console::log("{");
-      console::inl("  head: ");
-      console::log(ptrL->head->val);
-      console::inl(" tail: ");
-      console::log(ptrL->tail->val);
-      console::inl("  run: [ ");
-      console::inl(current->val);
-      while (current->next != nullptr)
-      {
-        current = current->next;
-        console::inl(" ");
-        console::inl(current->val);
-      }
-      console::log("   ]");
-      console::log("}");
-    }
+    left->sort();
+    right->sort();
+    List::merge(left, right, this);
   }
 };
