@@ -55,7 +55,6 @@ void merge(
 
 int main()
 {
-  char again{};
   const unsigned int queriedCPUs{std::thread::hardware_concurrency()};
   console::inl("Queried available logical processors: ");
   console::log(queriedCPUs);
@@ -66,8 +65,7 @@ int main()
   if (yesno != 'y' && yesno != 'Y')
   {
     console::log("Please input the correct number of threads available on your machine: ");
-    std::cin >>
-        threads;
+    std::cin >> threads;
   }
 
   unsigned long long countSteps{};
@@ -80,59 +78,79 @@ int main()
       countSteps++;
   }
 
-  do
+  yesno = 0;
+  MEMORYSTATUSEX mstax{};
+  mstax.dwLength = sizeof(mstax);
+  GlobalMemoryStatusEx(&mstax);
+  const unsigned long long physMem{mstax.ullAvailPhys / (1024 * 1024)};
+  const unsigned long long totMem{mstax.ullTotalPhys / (1024 * 1024)};
+  console::inl("Queried available memory in MB: ");
+  console::inl(physMem);
+  console::inl(" of ");
+  console::log(totMem);
+  console::log("Is this roughly correct? [y/n]");
+  std::cin >> yesno;
+  unsigned long long mem{physMem};
+  if (yesno != 'y' && yesno != 'Y')
   {
-    yesno = 0;
-    MEMORYSTATUSEX mstax{};
-    mstax.dwLength = sizeof(mstax);
-    GlobalMemoryStatusEx(&mstax);
-    const unsigned long long physMem{mstax.ullAvailPhys / (1024 * 1024)};
-    const unsigned long long totMem{mstax.ullTotalPhys / (1024 * 1024)};
-    console::inl("Queried available memory in MB: ");
-    console::inl(physMem);
-    console::inl(" of ");
-    console::log(totMem);
-    console::log("Is this roughly correct? [y/n]");
-    std::cin >> yesno;
-    unsigned long long mem{};
-    if (yesno != 'y' && yesno != 'Y')
-    {
-      console::log("Please input the current amount of AVAILABLE (total - occupied) memory in your machine, in MB:");
-      std::cin >> mem;
-    }
-    else
-      mem = physMem;
+    console::log("Please input the current amount of AVAILABLE (total - occupied) memory in your machine, in MB:");
+    std::cin >> mem;
+  }
 
-    const unsigned long long totalSort{(((mem / 100) * 1000000) / threads) * threads};
-    // const unsigned long long totalSort{(1000 / threads) * threads};
+  const unsigned long long totalSort{(((mem / 50) * 1000000) / threads) * threads};
+  // const unsigned long long totalSort{(1000 / threads) * threads};
 
-    console::inl("Max sortable long ints: ");
-    console::log(totalSort);
+  console::inl("Max sortable long ints: ");
+  console::log(totalSort);
 
-    std::vector<std::mutex *> locksAlloc, locksSorts{}, locksSieves{};
-    std::vector<std::future<void>> allocators{}, sorters{}, mergers{};
-    std::vector<List *> sieves{}, lists{};
+  std::vector<std::mutex *> locksAlloc, locksSorts{}, locksSieves{};
+  std::vector<std::future<void>> allocators{}, sorters{}, mergers{};
+  std::vector<List *> sieves{}, lists{};
 
-    // Start an absolute and per-area timer
-    const std::chrono::system_clock::time_point globalTimer{now()};
-    std::chrono::system_clock::time_point runningTimer{globalTimer};
+  // Start an absolute and per-area timer
+  const std::chrono::system_clock::time_point globalTimer{now()};
+  std::chrono::system_clock::time_point runningTimer{globalTimer};
 
-    for (int i{}; i < threads; i++)
-    {
-      lists.push_back(new List());
-      locksAlloc.push_back(new std::mutex);
-      locksAlloc[i]->lock();
-      allocators.push_back(std::async(std::launch::async, alloc, lists[i], totalSort / threads, locksAlloc[i]));
-    }
+  for (int i{}; i < threads; i++)
+  {
+    lists.push_back(new List());
+    locksAlloc.push_back(new std::mutex);
+    locksAlloc[i]->lock();
+    allocators.push_back(std::async(std::launch::async, alloc, lists[i], totalSort / threads, locksAlloc[i]));
+  }
 
-    for (int i{}; i < threads; i++)
-    {
-      locksSorts.push_back(new std::mutex);
-      locksSorts[i]->lock();
-      sorters.push_back(std::async(std::launch::async, sort, lists[i], locksAlloc[i], locksSorts[i]));
-    }
+  for (int i{}; i < threads; i++)
+  {
+    locksSorts.push_back(new std::mutex);
+    locksSorts[i]->lock();
+    sorters.push_back(std::async(std::launch::async, sort, lists[i], locksAlloc[i], locksSorts[i]));
+  }
 
-    for (int i{}; i < threads; i += 2)
+  for (int i{}; i < threads; i += 2)
+  {
+    sieves.push_back(new List());
+    locksSieves.push_back(new std::mutex);
+    locksSieves[locksSieves.size() - 1]->lock();
+    mergers.push_back(std::async(
+        std::launch::async,
+        merge,
+        lists[i],
+        lists[i + 1],
+        sieves[sieves.size() - 1],
+        locksSorts[i],
+        locksSorts[i + 1],
+        locksSieves[locksSieves.size() - 1]));
+  }
+
+  int sPos{};
+  int timesMerged{};
+
+  while (timesMerged < countSteps)
+  {
+    timesMerged++;
+    const size_t sieveSizeNow = sieves.size();
+
+    for (; sPos + 1 < sieveSizeNow; sPos += 2)
     {
       sieves.push_back(new List());
       locksSieves.push_back(new std::mutex);
@@ -140,68 +158,38 @@ int main()
       mergers.push_back(std::async(
           std::launch::async,
           merge,
-          lists[i],
-          lists[i + 1],
+          sieves[sPos],
+          sieves[sPos + 1],
           sieves[sieves.size() - 1],
-          locksSorts[i],
-          locksSorts[i + 1],
+          locksSieves[sPos],
+          locksSieves[sPos + 1],
           locksSieves[locksSieves.size() - 1]));
     }
+  }
 
-    int sPos{};
-    int timesMerged{};
+  for (int i = 0; i < mergers.size(); i++)
+    mergers[i].wait();
 
-    while (timesMerged < countSteps)
-    {
-      timesMerged++;
-      const size_t sieveSizeNow = sieves.size();
+  console::inl("Merge completed in ");
+  console::inl(timerInMS(runningTimer));
+  console::log(" milliseconds");
 
-      for (; sPos + 1 < sieveSizeNow; sPos += 2)
-      {
-        sieves.push_back(new List());
-        locksSieves.push_back(new std::mutex);
-        locksSieves[locksSieves.size() - 1]->lock();
-        mergers.push_back(std::async(
-            std::launch::async,
-            merge,
-            sieves[sPos],
-            sieves[sPos + 1],
-            sieves[sieves.size() - 1],
-            locksSieves[sPos],
-            locksSieves[sPos + 1],
-            locksSieves[locksSieves.size() - 1]));
-      }
-    }
+  const auto finalTimer = timerInMS(globalTimer);
 
-    for (int i = 0; i < mergers.size(); i++)
-      mergers[i].wait();
+  console::log("Total operation for allocating, sorting, and merging completed in");
+  console::inl(finalTimer);
+  console::inl(" milliseconds, for a total average rate of ");
+  console::inl(totalSort / finalTimer);
+  console::log(" ints/ms");
 
-    console::inl("Merge completed in ");
-    console::inl(timerInMS(runningTimer));
-    console::log(" milliseconds");
-
-    const auto finalTimer = timerInMS(globalTimer);
-
-    console::log("Total operation for allocating, sorting, and merging completed in");
-    console::inl(finalTimer);
-    console::inl(" milliseconds, for a total average rate of ");
-    console::inl(totalSort / finalTimer);
-    console::log(" ints/ms");
-
-    // Uncomment the lines below if you want to print the sorted vector when it's finished
-    // const List *finL{sieves[sieves.size() - 1]};
-    // Node *current = finL->head;
-    // if (current != nullptr)
-    //   console::log(current->val);
-    // while (current != nullptr)
-    // {
-    //   console::log(current->val);
-    //   current = current->next;
-    // }
-    // delete finL;
-      delete sieves[sieves.size() - 1];
-    console::log("Run again? [y/n] ");
-    std::cin >> again;
-    std::cout << std::endl;
-  } while (again == 'y' || again == 'Y');
+  // Uncomment the lines below if you want to print the sorted vector when it's finished
+  // const List *finL{sieves[sieves.size() - 1]};
+  // Node *current = finL->head;
+  // if (current != nullptr)
+  //   console::log(current->val);
+  // while (current != nullptr)
+  // {
+  //   console::log(current->val);
+  //   current = current->next;
+  // }
 }
