@@ -17,6 +17,12 @@
 
 #define timerInMS(timer) std::chrono::duration_cast<std::chrono::milliseconds>(now() - timer).count()
 
+void trash(std::vector<List *> &ptrV)
+{
+  std::vector<List *> trashV;
+  ptrV.swap(trashV);
+};
+
 void alloc(
     List *ptrL,
     const unsigned long long ceil,
@@ -26,7 +32,7 @@ void alloc(
   std::default_random_engine generator{rd()};
   std::uniform_int_distribution<unsigned long long> distribution{0, 0xFFFFFFFFFFFFFFFF};
   for (int i{}; i < ceil; i++)
-    ptrL->pushVal(distribution(generator));
+    ptrL->pushNode(new Node(distribution(generator)));
   // vect->push_back(rand());
   lockAlloc->unlock();
 };
@@ -97,8 +103,10 @@ int main()
     std::cin >> mem;
   }
 
-  const unsigned long long totalSort{(((mem / 32) * 1000000) / threads) * threads};
-  // const unsigned long long totalSort{(1000 / threads) * threads};
+  // const unsigned long long totalSort{(((mem / 32) * 1000000) / threads) * threads};
+  // const unsigned long long totalSort{(50000000 / threads) * threads};
+  unsigned long long totalSort{};
+  std::cin >> totalSort;
 
   console::inl("Max sortable long ints: ");
   console::log(totalSort);
@@ -182,8 +190,9 @@ int main()
   console::inl(totalSort / finalTimer);
   console::log(" ints/ms");
 
+  const List *finL{sieves[sieves.size() - 1]};
+  trash(sieves);
   // Uncomment the lines below if you want to print the sorted vector when it's finished
-  // const List *finL{sieves[sieves.size() - 1]};
   // Node *current = finL->head;
   // if (current != nullptr)
   //   console::log(current->val);
@@ -192,4 +201,14 @@ int main()
   //   console::log(current->val);
   //   current = current->next;
   // }
+  Node *dest{finL->head};
+  while (dest != nullptr)
+  {
+    Node *unheap{dest};
+    dest = dest->next;
+    delete unheap;
+  }
+  delete finL->head;
+  delete finL->tail;
+  system("pause");
 }
