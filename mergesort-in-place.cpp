@@ -57,8 +57,8 @@ bool is_sorted(const std::vector<unsigned long long> &refV)
 int main()
 {
   std::vector<unsigned long long> ints;
-  ints.reserve(1000000000);
-  for (int i{}; i < 1000000000; i++)
+  ints.reserve(2000000000);
+  for (int i{}; i < 2000000000; i++)
     ints.push_back(distribution(generator));
   const unsigned long long stepSize{ints.size() / 12};
   std::cout << "Sorting" << std::endl;
