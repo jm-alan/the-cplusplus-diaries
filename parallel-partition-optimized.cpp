@@ -1,6 +1,11 @@
 #include <future>
 #include <vector>
 #include <algorithm>
+#include <random>
+
+std::random_device rd{};
+std::default_random_engine generator{rd()};
+std::uniform_int_distribution<unsigned long long> distribution{0, 0xFFFFFFFFFFFFFFFF};
 
 const std::vector<unsigned long long> partition(
     unsigned long long *ptrArr,
@@ -43,7 +48,20 @@ const std::vector<unsigned long long> partition(
   return partIdxs;
 };
 
+void alloc(
+    unsigned long long *ptrV,
+    const unsigned long long start,
+    const unsigned long long end,
+    std::mutex *sectionMut)
+{
+  for (unsigned long long i{start}; i < end; i++)
+    ptrV[i] = distribution(generator);
+  // ptrV[i] = rand();
+  sectionMut->unlock();
+};
+
 int main()
 {
   const unsigned int threads{std::thread::hardware_concurrency()};
+  unsigned long long *ints{new unsigned long long[100]{}};
 }
