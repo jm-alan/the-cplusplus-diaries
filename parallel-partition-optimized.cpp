@@ -2,6 +2,7 @@
 #include <vector>
 #include <algorithm>
 #include <random>
+#include <iostream>
 
 std::random_device rd{};
 std::default_random_engine generator{rd()};
@@ -48,6 +49,64 @@ const std::vector<unsigned long long> partition(
   return partIdxs;
 };
 
+void sort_serial(
+    unsigned long long *ptrV,
+    const unsigned long long start,
+    const unsigned long long end)
+{
+  if ((end - start) < 2)
+    return;
+  const unsigned long long pivot = ptrV[end - 1];
+  unsigned long long breakPoint{start}, validPointer{start};
+  unsigned long long staging{};
+  while (validPointer < (end - 1))
+  {
+    if (ptrV[validPointer] < pivot)
+    {
+      staging = ptrV[breakPoint];
+      ptrV[breakPoint] = ptrV[validPointer];
+      ptrV[validPointer] = staging;
+      breakPoint++;
+    }
+    validPointer++;
+  }
+  staging = ptrV[breakPoint];
+  ptrV[breakPoint] = ptrV[end - 1];
+  ptrV[end - 1] = staging;
+  sort_serial(ptrV, start, breakPoint);
+  sort_serial(ptrV, breakPoint + 1, end);
+};
+
+void sort_concurrent(
+    unsigned long long *ptrV,
+    const unsigned long long start,
+    const unsigned long long end,
+    std::mutex *sectionMut)
+{
+  std::lock_guard<std::mutex> guard{*sectionMut};
+  if ((end - start) < 2)
+    return;
+  const unsigned long long pivot = ptrV[end - 1];
+  unsigned long long breakPoint{start}, validPointer{start};
+  unsigned long long staging{};
+  while (validPointer < (end - 1))
+  {
+    if (ptrV[validPointer] < pivot)
+    {
+      staging = ptrV[breakPoint];
+      ptrV[breakPoint] = ptrV[validPointer];
+      ptrV[validPointer] = staging;
+      breakPoint++;
+    }
+    validPointer++;
+  }
+  staging = ptrV[breakPoint];
+  ptrV[breakPoint] = ptrV[end - 1];
+  ptrV[end - 1] = staging;
+  sort_serial(ptrV, start, breakPoint);
+  sort_serial(ptrV, breakPoint + 1, end);
+};
+
 void alloc(
     unsigned long long *ptrV,
     const unsigned long long start,
@@ -63,5 +122,4 @@ void alloc(
 int main()
 {
   const unsigned int threads{std::thread::hardware_concurrency()};
-  unsigned long long *ints{new unsigned long long[100]{}};
 }
