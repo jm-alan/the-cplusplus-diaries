@@ -111,12 +111,12 @@ void alloc(
     unsigned long long *ptrV,
     const unsigned long long start,
     const unsigned long long end,
-    std::mutex *sectionMut)
+    std::mutex *sectionLock)
 {
   for (unsigned long long i{start}; i < end; i++)
     ptrV[i] = distribution(generator);
   // ptrV[i] = rand();
-  sectionMut->unlock();
+  sectionLock->unlock();
 };
 
 int main()
