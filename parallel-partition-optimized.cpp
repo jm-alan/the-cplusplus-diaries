@@ -119,6 +119,16 @@ void alloc(
   sectionLock->unlock();
 };
 
+bool is_sorted(
+    const unsigned long long *ptrArr,
+    const unsigned long long len)
+{
+  for (unsigned long long i{}; i < len - 1; i++)
+    if (ptrArr[i] > ptrArr[i + 1])
+      return false;
+  return true;
+}
+
 int main()
 {
   const unsigned int threads{std::thread::hardware_concurrency()};
