@@ -345,14 +345,18 @@ int main()
   futures.push_back(std::async(std::launch::async, sort_known_end, ints, futPartSeven, cap, 1));
   for (size_t i{}; i < futures.size(); i++)
     futures[i].wait();
-  std::clog << "Partitioned and sorted array in " << timer_cast_ms(timer) << "ms" << std::endl;
+  const auto sortTime{timer_cast_ms(timer)};
+  std::clog
+      << "Partitioned and sorted array in " << sortTime << "ms" << std::endl
+      << " for a total processing speed of "
+      << cap / sortTime << " ints/ms" << std::endl;
   sync(timer);
   std::clog << "Array is sorted: " << std::boolalpha << is_sorted(ints, cap) << std::endl;
   std::clog << "Validated array in " << timer_cast_ms(timer) << "ms" << std::endl;
   const auto finalTime{timer_cast_ms(globalTimer)};
   std::clog
-      << "Total process for allocating, partitioning, sorting, and verifying "
-      << cap << " 64-bit unsigned ints completed in " << finalTime
-      << "ms, for a total speed of " << (cap / finalTime)
-      << " ints/ms" << std::endl;
+      << "Total process for allocating, partitioning, sorting, and verifying " << std::endl
+      << cap << " 64-bit unsigned ints completed in " << finalTime << "ms" << std::endl
+      << " for a total speed of " << (cap / finalTime) << " ints/ms" << std::endl;
+  system("pause");
 }
