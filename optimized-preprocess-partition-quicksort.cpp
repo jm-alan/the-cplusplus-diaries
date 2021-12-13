@@ -116,42 +116,6 @@ std::vector<unsigned long long> partition_known_end(
   return partIdxs;
 };
 
-std::vector<unsigned long long> partition_concurrent(
-    unsigned long long *ptrArr,
-    std::shared_future<std::vector<unsigned long long>> futStart,
-    std::shared_future<std::vector<unsigned long long>> futEnd,
-    const unsigned int numPivots)
-{
-  const unsigned long long start{futStart.get()[0]};
-  const unsigned long long end{futEnd.get()[0]};
-  std::vector<unsigned long long> partIdxs{};
-  std::sort(ptrArr + (end - numPivots), ptrArr + end);
-  size_t breakPoint{start}, validPoint{};
-  unsigned long long staging{};
-  for (unsigned int i{}; i < numPivots; i++)
-  {
-    unsigned long long pivotIdx{end - (numPivots - i)};
-    const unsigned long long pivot{ptrArr[pivotIdx]};
-    validPoint = breakPoint;
-    while (validPoint < (end - (numPivots - i)))
-    {
-      if (ptrArr[validPoint] < pivot)
-      {
-        staging = ptrArr[breakPoint];
-        ptrArr[breakPoint] = ptrArr[validPoint];
-        ptrArr[validPoint] = staging;
-        breakPoint++;
-      }
-      validPoint++;
-    }
-    partIdxs.push_back(breakPoint);
-    staging = ptrArr[breakPoint];
-    ptrArr[breakPoint] = ptrArr[pivotIdx];
-    ptrArr[pivotIdx] = staging;
-  }
-  return partIdxs;
-};
-
 void sort_serial(
     unsigned long long *ptrV,
     const unsigned long long start,
