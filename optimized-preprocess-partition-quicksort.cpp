@@ -10,10 +10,10 @@
 
 std::random_device rd{};
 std::default_random_engine generator{rd()};
-std::uniform_int_distribution<unsigned long long> distribution{0, 0xFFFFFFFFFFFFFFFF};
+std::uniform_int_distribution<unsigned int> distribution{0, 0xFFFFFFFF};
 
-std::vector<unsigned long long> partition_serial(
-    unsigned long long *ptrArr,
+std::vector<unsigned long long> partition(
+    unsigned int *ptrArr,
     const unsigned long long start,
     const unsigned long long end,
     const unsigned int numPivots)
@@ -21,11 +21,11 @@ std::vector<unsigned long long> partition_serial(
   std::vector<unsigned long long> partIdxs{};
   std::sort(ptrArr + (end - numPivots), ptrArr + end);
   size_t breakPoint{start}, validPoint{};
-  unsigned long long staging{};
+  unsigned int staging{};
   for (unsigned int i{}; i < numPivots; i++)
   {
     unsigned long long pivotIdx{end - (numPivots - i)};
-    const unsigned long long pivot{ptrArr[pivotIdx]};
+    const unsigned int pivot{ptrArr[pivotIdx]};
     validPoint = breakPoint;
     while (validPoint < (end - (numPivots - i)))
     {
@@ -46,8 +46,8 @@ std::vector<unsigned long long> partition_serial(
   return partIdxs;
 };
 
-std::vector<unsigned long long> partition_known_start(
-    unsigned long long *ptrArr,
+std::vector<unsigned long long> partition(
+    unsigned int *ptrArr,
     const unsigned long long start,
     std::shared_future<std::vector<unsigned long long>> futEnd,
     const unsigned int numPivots)
@@ -56,11 +56,11 @@ std::vector<unsigned long long> partition_known_start(
   std::vector<unsigned long long> partIdxs{};
   std::sort(ptrArr + (end - numPivots), ptrArr + end);
   size_t breakPoint{start}, validPoint{};
-  unsigned long long staging{};
+  unsigned int staging{};
   for (unsigned int i{}; i < numPivots; i++)
   {
     unsigned long long pivotIdx{end - (numPivots - i)};
-    const unsigned long long pivot{ptrArr[pivotIdx]};
+    const unsigned int pivot{ptrArr[pivotIdx]};
     validPoint = breakPoint;
     while (validPoint < (end - (numPivots - i)))
     {
@@ -81,8 +81,8 @@ std::vector<unsigned long long> partition_known_start(
   return partIdxs;
 };
 
-std::vector<unsigned long long> partition_known_end(
-    unsigned long long *ptrArr,
+std::vector<unsigned long long> partition(
+    unsigned int *ptrArr,
     std::shared_future<std::vector<unsigned long long>> futStart,
     const unsigned long long end,
     const unsigned int numPivots)
@@ -91,11 +91,11 @@ std::vector<unsigned long long> partition_known_end(
   std::vector<unsigned long long> partIdxs{};
   std::sort(ptrArr + (end - numPivots), ptrArr + end);
   size_t breakPoint{start}, validPoint{};
-  unsigned long long staging{};
+  unsigned int staging{};
   for (unsigned int i{}; i < numPivots; i++)
   {
     unsigned long long pivotIdx{end - (numPivots - i)};
-    const unsigned long long pivot{ptrArr[pivotIdx]};
+    const unsigned int pivot{ptrArr[pivotIdx]};
     validPoint = breakPoint;
     while (validPoint < (end - (numPivots - i)))
     {
@@ -117,132 +117,128 @@ std::vector<unsigned long long> partition_known_end(
 };
 
 void sort_serial(
-    unsigned long long *ptrV,
+    unsigned int *ptrArr,
     const unsigned long long start,
     const unsigned long long end)
 {
   if ((end - start) < 2)
     return;
-  const unsigned long long pivot = ptrV[end - 1];
+  const unsigned int pivot = ptrArr[end - 1];
   unsigned long long breakPoint{start}, validPointer{start};
-  unsigned long long staging{};
+  unsigned int staging{};
   while (validPointer < (end - 1))
   {
-    if (ptrV[validPointer] < pivot)
+    if (ptrArr[validPointer] < pivot)
     {
-      staging = ptrV[breakPoint];
-      ptrV[breakPoint] = ptrV[validPointer];
-      ptrV[validPointer] = staging;
+      staging = ptrArr[breakPoint];
+      ptrArr[breakPoint] = ptrArr[validPointer];
+      ptrArr[validPointer] = staging;
       breakPoint++;
     }
     validPointer++;
   }
-  staging = ptrV[breakPoint];
-  ptrV[breakPoint] = ptrV[end - 1];
-  ptrV[end - 1] = staging;
-  sort_serial(ptrV, start, breakPoint);
-  sort_serial(ptrV, breakPoint + 1, end);
-};
-
-void sort_known_start(
-    unsigned long long *ptrV,
-    const unsigned long long start,
-    std::shared_future<std::vector<unsigned long long>> futEnd,
-    const unsigned long long futIdx)
-{
-  std::clog << "Entered sort" << std::endl;
-  const unsigned long long end{futEnd.get()[futIdx]};
-  std::clog << "Successfully started sort " << start << " " << end << std::endl;
-  if ((end - start) < 2)
-    return;
-  const unsigned long long pivot = ptrV[end - 1];
-  unsigned long long breakPoint{start}, validPointer{start};
-  unsigned long long staging{};
-  while (validPointer < (end - 1))
-  {
-    if (ptrV[validPointer] < pivot)
-    {
-      staging = ptrV[breakPoint];
-      ptrV[breakPoint] = ptrV[validPointer];
-      ptrV[validPointer] = staging;
-      breakPoint++;
-    }
-    validPointer++;
-  }
-  staging = ptrV[breakPoint];
-  ptrV[breakPoint] = ptrV[end - 1];
-  ptrV[end - 1] = staging;
-  sort_serial(ptrV, start, breakPoint);
-  sort_serial(ptrV, breakPoint + 1, end);
-};
-
-void sort_known_end(
-    unsigned long long *ptrV,
-    std::shared_future<std::vector<unsigned long long>> futStart,
-    const unsigned long long end,
-    const unsigned long long futIdx)
-{
-  std::clog << "Entered sort" << std::endl;
-  const unsigned long long start{futStart.get()[futIdx]};
-  std::clog << "Successfully started sort " << start << " " << end << std::endl;
-  if ((end - start) < 2)
-    return;
-  const unsigned long long pivot = ptrV[end - 1];
-  unsigned long long breakPoint{start}, validPointer{start};
-  unsigned long long staging{};
-  while (validPointer < (end - 1))
-  {
-    if (ptrV[validPointer] < pivot)
-    {
-      staging = ptrV[breakPoint];
-      ptrV[breakPoint] = ptrV[validPointer];
-      ptrV[validPointer] = staging;
-      breakPoint++;
-    }
-    validPointer++;
-  }
-  staging = ptrV[breakPoint];
-  ptrV[breakPoint] = ptrV[end - 1];
-  ptrV[end - 1] = staging;
-  sort_serial(ptrV, start, breakPoint);
-  sort_serial(ptrV, breakPoint + 1, end);
+  staging = ptrArr[breakPoint];
+  ptrArr[breakPoint] = ptrArr[end - 1];
+  ptrArr[end - 1] = staging;
+  sort_serial(ptrArr, start, breakPoint);
+  sort_serial(ptrArr, breakPoint + 1, end);
 };
 
 void sort_concurrent(
-    unsigned long long *ptrV,
-    std::shared_future<std::vector<unsigned long long>> futStart,
+    unsigned int *ptrArr,
+    const unsigned long long start,
     std::shared_future<std::vector<unsigned long long>> futEnd,
-    const unsigned long long futStartIdx,
-    const unsigned long long futEndIdx)
+    const unsigned int futIdx,
+    const unsigned int _waste)
 {
-  std::clog << "Entered sort" << std::endl;
-  const unsigned long long start{futStart.get()[futStartIdx]}, end{futEnd.get()[futEndIdx]};
-  std::clog << "Successfully started sort " << start << " " << end << std::endl;
+  const unsigned long long end{futEnd.get()[futIdx]};
   if ((end - start) < 2)
     return;
-  const unsigned long long pivot = ptrV[end - 1];
+  const unsigned int pivot = ptrArr[end - 1];
   unsigned long long breakPoint{start}, validPointer{start};
-  unsigned long long staging{};
+  unsigned int staging{};
   while (validPointer < (end - 1))
   {
-    if (ptrV[validPointer] < pivot)
+    if (ptrArr[validPointer] < pivot)
     {
-      staging = ptrV[breakPoint];
-      ptrV[breakPoint] = ptrV[validPointer];
-      ptrV[validPointer] = staging;
+      staging = ptrArr[breakPoint];
+      ptrArr[breakPoint] = ptrArr[validPointer];
+      ptrArr[validPointer] = staging;
       breakPoint++;
     }
     validPointer++;
   }
-  staging = ptrV[breakPoint];
-  ptrV[breakPoint] = ptrV[end - 1];
-  ptrV[end - 1] = staging;
-  sort_serial(ptrV, start, breakPoint);
-  sort_serial(ptrV, breakPoint + 1, end);
+  staging = ptrArr[breakPoint];
+  ptrArr[breakPoint] = ptrArr[end - 1];
+  ptrArr[end - 1] = staging;
+  sort_serial(ptrArr, start, breakPoint);
+  sort_serial(ptrArr, breakPoint + 1, end);
+};
+
+void sort_concurrent(
+    unsigned int *ptrArr,
+    std::shared_future<std::vector<unsigned long long>> futStart,
+    const unsigned long long end,
+    const unsigned int futIdx,
+    const unsigned int _waste)
+{
+  const unsigned long long start{futStart.get()[futIdx]};
+  if ((end - start) < 2)
+    return;
+  const unsigned int pivot = ptrArr[end - 1];
+  unsigned long long breakPoint{start}, validPointer{start};
+  unsigned int staging{};
+  while (validPointer < (end - 1))
+  {
+    if (ptrArr[validPointer] < pivot)
+    {
+      staging = ptrArr[breakPoint];
+      ptrArr[breakPoint] = ptrArr[validPointer];
+      ptrArr[validPointer] = staging;
+      breakPoint++;
+    }
+    validPointer++;
+  }
+  staging = ptrArr[breakPoint];
+  ptrArr[breakPoint] = ptrArr[end - 1];
+  ptrArr[end - 1] = staging;
+  sort_serial(ptrArr, start, breakPoint);
+  sort_serial(ptrArr, breakPoint + 1, end);
+};
+
+void sort_concurrent(
+    unsigned int *ptrArr,
+    std::shared_future<std::vector<unsigned long long>> futStart,
+    std::shared_future<std::vector<unsigned long long>> futEnd,
+    const unsigned int futStartIdx,
+    const unsigned int futEndIdx)
+{
+  const unsigned long long start{futStart.get()[futStartIdx]}, end{futEnd.get()[futEndIdx]};
+  if ((end - start) < 2)
+    return;
+  const unsigned int pivot = ptrArr[end - 1];
+  unsigned long long breakPoint{start}, validPointer{start};
+  unsigned int staging{};
+  while (validPointer < (end - 1))
+  {
+    if (ptrArr[validPointer] < pivot)
+    {
+      staging = ptrArr[breakPoint];
+      ptrArr[breakPoint] = ptrArr[validPointer];
+      ptrArr[validPointer] = staging;
+      breakPoint++;
+    }
+    validPointer++;
+  }
+  staging = ptrArr[breakPoint];
+  ptrArr[breakPoint] = ptrArr[end - 1];
+  ptrArr[end - 1] = staging;
+  sort_serial(ptrArr, start, breakPoint);
+  sort_serial(ptrArr, breakPoint + 1, end);
 };
 
 void alloc(
-    unsigned long long *ptrArr,
+    unsigned int *ptrArr,
     const unsigned long long start,
     const unsigned long long end)
 {
@@ -252,10 +248,10 @@ void alloc(
 };
 
 bool is_sorted(
-    const unsigned long long *ptrArr,
-    const unsigned long long len)
+    const unsigned int *ptrArr,
+    const unsigned int len)
 {
-  for (unsigned long long i{}; i < len - 1; i++)
+  for (unsigned int i{}; i < len - 1; i++)
     if (ptrArr[i] > ptrArr[i + 1])
       return false;
   return true;
@@ -263,10 +259,10 @@ bool is_sorted(
 
 int main()
 {
-  const unsigned long long threads{std::thread::hardware_concurrency()};
-  unsigned long long parts{threads};
+  const unsigned int threads{std::thread::hardware_concurrency()};
+  unsigned int parts{threads};
   std::vector<std::shared_future<void>> futures{};
-  const unsigned long long allocSectionSize{2500000000ULL / threads};
+  const unsigned long long allocSectionSize{6000000000ULL / threads};
   const unsigned long long cap{allocSectionSize * threads};
   auto timer{std::chrono::system_clock::now()};
   const auto globalTimer{timer};
@@ -295,8 +291,8 @@ int main()
     futures[i].wait();
   std::clog << "Randomized array in " << timer_cast_ms(timer) << "ms" << std::endl;
   sync(timer);
-  const unsigned int partOne{l_part(ints, 0, cap, 1)[0]};
-  std::shared_future<std::vector<unsigned int>>
+  const unsigned long long partOne{l_part(ints, 0, cap, 1)[0]};
+  std::shared_future<std::vector<unsigned long long>>
       futPartTwo{std::async(std::launch::async, l_part, ints, 0, partOne, 1)},
       futPartThree{std::async(std::launch::async, l_part, ints, partOne, cap, 1)},
       futPartFour{std::async(std::launch::async, l_part, ints, 0, futPartTwo, 2)},
@@ -320,15 +316,14 @@ int main()
   const auto sortTime{timer_cast_ms(timer)};
   std::clog
       << "Partitioned and sorted array in " << sortTime << "ms" << std::endl
-      << " for a total processing speed of "
-      << cap / sortTime << " ints/ms" << std::endl;
+      << "for a total processing speed of " << cap / sortTime << " ints/ms" << std::endl;
   sync(timer);
   std::clog << "Array is sorted: " << std::boolalpha << is_sorted(ints, cap) << std::endl;
   std::clog << "Validated array in " << timer_cast_ms(timer) << "ms" << std::endl;
   const auto finalTime{timer_cast_ms(globalTimer)};
   std::clog
       << "Total process for allocating, partitioning, sorting, and verifying " << std::endl
-      << cap << " 64-bit unsigned ints completed in " << finalTime << "ms" << std::endl
-      << " for a total speed of " << (cap / finalTime) << " ints/ms" << std::endl;
+      << cap << " 32-bit unsigned ints completed in " << finalTime << "ms" << std::endl
+      << "for a total speed of " << (cap / finalTime) << " ints/ms" << std::endl;
   system("pause");
 }
