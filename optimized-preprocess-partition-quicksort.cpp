@@ -306,7 +306,15 @@ int main()
   const unsigned long long cap{allocSectionSize * threads};
   auto timer{std::chrono::system_clock::now()};
   const auto globalTimer{timer};
-  unsigned long long *ints{new unsigned long long[cap]{}};
+  unsigned int *ints{new unsigned int[cap]{}};
+  const auto l_part = [](auto one, auto two, auto three, auto four)
+  {
+    return partition(one, two, three, four);
+  };
+  const auto l_sort = [](auto one, auto two, auto three, auto four, auto five)
+  {
+    sort_concurrent(one, two, three, four, five);
+  };
   std::clog << "Allocated array in " << timer_cast_ms(timer) << "ms" << std::endl;
   sync(timer);
   for (unsigned int i{}; i < threads; i++)
@@ -323,26 +331,26 @@ int main()
     futures[i].wait();
   std::clog << "Randomized array in " << timer_cast_ms(timer) << "ms" << std::endl;
   sync(timer);
-  const unsigned long long partOne{partition_serial(ints, 0, cap, 1)[0]};
-  std::shared_future<std::vector<unsigned long long>>
-      futPartTwo{std::async(std::launch::async, partition_serial, ints, 0, partOne, 1)},
-      futPartThree{std::async(std::launch::async, partition_serial, ints, partOne, cap, 1)},
-      futPartFour{std::async(std::launch::async, partition_known_start, ints, 0, futPartTwo, 2)},
-      futPartFive{std::async(std::launch::async, partition_known_end, ints, futPartTwo, partOne, 2)},
-      futPartSix{std::async(std::launch::async, partition_known_start, ints, partOne, futPartThree, 2)},
-      futPartSeven{std::async(std::launch::async, partition_known_end, ints, futPartThree, cap, 2)};
-  futures.push_back(std::async(std::launch::async, sort_known_start, ints, 0, futPartFour, 0));
-  futures.push_back(std::async(std::launch::async, sort_concurrent, ints, futPartFour, futPartFour, 0, 1));
-  futures.push_back(std::async(std::launch::async, sort_concurrent, ints, futPartFour, futPartTwo, 1, 0));
-  futures.push_back(std::async(std::launch::async, sort_concurrent, ints, futPartTwo, futPartFive, 0, 0));
-  futures.push_back(std::async(std::launch::async, sort_concurrent, ints, futPartFive, futPartFive, 0, 1));
-  futures.push_back(std::async(std::launch::async, sort_known_end, ints, futPartFive, partOne, 1));
-  futures.push_back(std::async(std::launch::async, sort_known_start, ints, partOne, futPartSix, 0));
-  futures.push_back(std::async(std::launch::async, sort_concurrent, ints, futPartSix, futPartSix, 0, 1));
-  futures.push_back(std::async(std::launch::async, sort_concurrent, ints, futPartSix, futPartThree, 1, 0));
-  futures.push_back(std::async(std::launch::async, sort_concurrent, ints, futPartThree, futPartSeven, 0, 0));
-  futures.push_back(std::async(std::launch::async, sort_concurrent, ints, futPartSeven, futPartSeven, 0, 1));
-  futures.push_back(std::async(std::launch::async, sort_known_end, ints, futPartSeven, cap, 1));
+  const unsigned int partOne{l_part(ints, 0, cap, 1)[0]};
+  std::shared_future<std::vector<unsigned int>>
+      futPartTwo{std::async(std::launch::async, l_part, ints, 0, partOne, 1)},
+      futPartThree{std::async(std::launch::async, l_part, ints, partOne, cap, 1)},
+      futPartFour{std::async(std::launch::async, l_part, ints, 0, futPartTwo, 2)},
+      futPartFive{std::async(std::launch::async, l_part, ints, futPartTwo, partOne, 2)},
+      futPartSix{std::async(std::launch::async, l_part, ints, partOne, futPartThree, 2)},
+      futPartSeven{std::async(std::launch::async, l_part, ints, futPartThree, cap, 2)};
+  futures.push_back(std::async(std::launch::async, l_sort, ints, 0, futPartFour, 0, 0));
+  futures.push_back(std::async(std::launch::async, l_sort, ints, futPartFour, futPartFour, 0, 1));
+  futures.push_back(std::async(std::launch::async, l_sort, ints, futPartFour, futPartTwo, 1, 0));
+  futures.push_back(std::async(std::launch::async, l_sort, ints, futPartTwo, futPartFive, 0, 0));
+  futures.push_back(std::async(std::launch::async, l_sort, ints, futPartFive, futPartFive, 0, 1));
+  futures.push_back(std::async(std::launch::async, l_sort, ints, futPartFive, partOne, 1, 0));
+  futures.push_back(std::async(std::launch::async, l_sort, ints, partOne, futPartSix, 0, 0));
+  futures.push_back(std::async(std::launch::async, l_sort, ints, futPartSix, futPartSix, 0, 1));
+  futures.push_back(std::async(std::launch::async, l_sort, ints, futPartSix, futPartThree, 1, 0));
+  futures.push_back(std::async(std::launch::async, l_sort, ints, futPartThree, futPartSeven, 0, 0));
+  futures.push_back(std::async(std::launch::async, l_sort, ints, futPartSeven, futPartSeven, 0, 1));
+  futures.push_back(std::async(std::launch::async, l_sort, ints, futPartSeven, cap, 1, 0));
   for (size_t i{}; i < futures.size(); i++)
     futures[i].wait();
   const auto sortTime{timer_cast_ms(timer)};
