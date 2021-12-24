@@ -262,7 +262,10 @@ int main()
   const unsigned int threads{std::thread::hardware_concurrency()};
   unsigned int parts{threads};
   std::vector<std::shared_future<void>> futures{};
-  const unsigned long long allocSectionSize{6000000000ULL / threads};
+  unsigned long long ceil{};
+  std::cin >> ceil;
+  std::clog << std::endl;
+  const unsigned long long allocSectionSize{ceil / threads};
   const unsigned long long cap{allocSectionSize * threads};
   auto timer{std::chrono::system_clock::now()};
   const auto globalTimer{timer};
